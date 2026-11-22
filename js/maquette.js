@@ -1,6 +1,7 @@
 /* js/maquette.js — éditeur visuel de la mise en page (espace prof)
-   Les modifications se font sur un BROUILLON : rien n'est appliqué
-   aux espaces élève/prof tant que « Valider la maquette » n'est pas cliqué. */
+   Les modifications se font sur un BROUILLON, puis sont enregistrées
+   AUTOMATIQUEMENT une fraction de seconde après le dernier geste :
+   les espaces élève/prof suivent tout de suite, sans bouton « Valider ». */
 (function () {
   const App = (window.App = window.App || {});
   const M = (App.maquette = {});
@@ -19,6 +20,8 @@
   let draft = null;
   let drag = null;
   let hoverZone = null;
+  let applyTimer = null;
+  let flashTimer = null;
 
   const $ = (sel) => root.querySelector(sel);
   const clone = (o) => JSON.parse(JSON.stringify(o));
@@ -46,8 +49,6 @@
       rowIds: App.state.rows().map((r) => String(r.id))
     };
   }
-
-  const isDirty = () => JSON.stringify(draft) !== JSON.stringify(fromState());
 
   const getVal = (key) => (key.indexOf('theme.') === 0 ? draft.theme[key.slice(6)] : draft[key]);
   function setVal(key, value) {
@@ -129,14 +130,13 @@
         <h2>Maquette de l'exercice</h2>
         <div class="tools">
           <button type="button" class="btn small" id="mq-reset-style">Style par défaut</button>
-          <button type="button" class="btn" id="mq-cancel" disabled>Annuler</button>
-          <button type="button" class="btn primary" id="mq-apply" disabled>Valider la maquette</button>
+          <span id="mq-status" class="mq-status" role="status" aria-live="polite"></span>
         </div>
       </div>
       <p class="hint">
-        Glissez les éléments dans l'aperçu pour organiser l'écran. Rien n'est appliqué
-        aux espaces élève et prof tant que vous n'avez pas cliqué sur
-        <strong>« Valider la maquette »</strong>.
+        Glissez les éléments dans l'aperçu pour organiser l'écran. Chaque réglage est
+        <strong>enregistré automatiquement</strong> (indicateur en haut à droite) et aussitôt
+        visible dans les espaces élève et prof.
       </p>
       <div class="mq-layout">
         <div class="mq-preview-col" id="mq-preview"></div>
@@ -146,19 +146,19 @@
     draft = fromState();
     syncControls();
     renderPreview();
-    updateButtons();
+    setStatus('', false);
 
     root.addEventListener('pointerdown', onPointerDown);
     root.addEventListener('input', onFieldInput);
     root.addEventListener('change', onFieldInput);
     root.addEventListener('click', onClick);
 
-    // Un changement fait ailleurs (import, module ajouté…) recharge le brouillon
     App.state.onChange(() => {
+      if (applyTimer) { clearTimeout(applyTimer); applyTimer = null; }
       draft = fromState();
       syncControls();
       renderPreview();
-      updateButtons();
+      setStatus('', false);
     });
   };
 
@@ -171,47 +171,65 @@
     });
   }
 
-  function updateButtons() {
-    const dirty = isDirty();
-    $('#mq-apply').disabled = !dirty;
-    $('#mq-cancel').disabled = !dirty;
+  /* =========================================================
+     ENREGISTREMENT AUTOMATIQUE
+     ========================================================= */
+  function setStatus(text, busy) {
+    const el = root && root.querySelector('#mq-status');
+    if (!el) return;
+    el.textContent = text;
+    el.classList.toggle('is-busy', !!busy);
   }
 
-  /* =========================================================
-     RÉGLAGES
-     ========================================================= */
+  /* Programme l'application du brouillon après une courte pause :
+   pendant le rendu en direct (glisser, redimensionner) rien n'est
+   réécrit, c'est le dernier état qui fait foi. */
+  function scheduleApply() {
+    setStatus('Enregistrement…', true);
+    clearTimeout(applyTimer);
+    applyTimer = setTimeout(runApply, 600);
+  }
+
+  function runApply() {
+    applyTimer = null;
+    if (!applyDraft(true)) { setStatus('', false); return; }
+    setStatus('✓ Enregistré', false);
+    clearTimeout(flashTimer);
+    flashTimer = setTimeout(() => {
+      if (applyTimer == null) setStatus('', false);
+    }, 2500);
+  }
+
   function onFieldInput(e) {
     const el = e.target.closest('[data-mq]');
     if (!el) return;
     const key = el.dataset.mq;
     setVal(key, (key === 'boardCols' || key === 'poolsCols') ? gridN(el.value) : el.value);
     renderPreview();
-    updateButtons();
+    scheduleApply();
   }
 
   function onClick(e) {
     const reset = e.target.closest('[data-mq-reset]');
     if (reset) {
       draft.theme[reset.dataset.mqReset] = '';
-      syncControls(); renderPreview(); updateButtons();
+      syncControls(); renderPreview(); scheduleApply();
       return;
     }
     const btn = e.target.closest('button[id]');
     if (!btn) return;
-    if (btn.id === 'mq-apply') applyDraft();
-    else if (btn.id === 'mq-cancel') {
-      draft = fromState();
-      syncControls(); renderPreview(); updateButtons();
-    } else if (btn.id === 'mq-reset-style') {
+    if (btn.id === 'mq-reset-style') {
       draft.theme = T.resolve({});
-      syncControls(); renderPreview(); updateButtons();
+      syncControls(); renderPreview(); scheduleApply();
     }
   }
 
-  function applyDraft() {
+  /* Applique le brouillon aux données officielles ; renvoie false si
+     la disposition n'est pas applicable (mode silencieux : sans alerte). */
+  function applyDraft(silent) {
     if (!draft.modules.some((m) => m.role === 'associate')) {
-      alert('Il faut au moins un module « à associer » dans le plateau.');
-      return;
+      if (!silent) alert('Il faut au moins un module « à associer » dans le plateau.');
+      return false;
     }
     const c = clone(App.state.config());
     c.title = draft.title.trim();
@@ -223,6 +241,7 @@
     c.modules = clone(draft.modules);
     App.state.updateConfig(c);
     App.state.reorderRows(draft.rowIds);
+    return true;
   }
 
   /* =========================================================
@@ -454,7 +473,7 @@
     window.removeEventListener('pointerup', onResizeEnd);
     window.removeEventListener('pointercancel', onResizeEnd);
     rz = null;
-    updateButtons();
+    scheduleApply();
   }
 
   function endDrag() {
@@ -484,7 +503,7 @@
     else if (d.kind === 'row') moveRow(d.id, index);
     else if (d.kind === 'module') moveModule(d.id, zone, index);
     renderPreview();
-    updateButtons();
+    scheduleApply();
   }
 
   function moveRow(id, index) {
