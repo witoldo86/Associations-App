@@ -127,6 +127,13 @@
         records.forEach((rec) => {
           if (rec && rec.key && rec.blob) cacheBlob(rec.key, rec.blob);
         });
+        /* Le premier rendu peut survenir avant la fin de ce préchargement
+           (affichage asynchrone) : les références « media: » étaient alors
+           affichées vides jusqu'au prochain re-rendu. On relance un rendu
+           de rattrapage dès que les fichiers sont disponibles. */
+        if (records.length && App.state && typeof App.state.emit === 'function') {
+          App.state.emit();
+        }
       })
       .catch((e) => console.warn('[media] préchargement impossible', e));
   }
