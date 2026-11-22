@@ -117,6 +117,15 @@
     </section>`;
   }
 
+  /* Sélection mise à jour en place (classe CSS) : reconstruire le HTML remplacerait
+     les nœuds et ferait retomber le dblclick du double-clic sur la liste, pas sur le bloc. */
+  function setSelectedModule(id) {
+    selectedModuleId = id;
+    $$('.mod-block').forEach((b) =>
+      b.classList.toggle('selected', String(b.dataset.moduleId) === String(selectedModuleId)));
+    updateModToolbar();
+  }
+
   function renderModules() {
     const mods = allMods();
     $('#mod-count').textContent = mods.length;
@@ -199,8 +208,7 @@
     const block = e.target.closest('.mod-block');
     if (!block || e.target.closest('.mod-btn')) return;
     const id = block.dataset.moduleId;
-    selectedModuleId = id;
-    renderModules();
+    setSelectedModule(id);
     startEditModule(id);
   }
 
@@ -322,9 +330,7 @@
     const d = modDrag; modDrag = null;
     if (!d.dragging) {
       if (e.target && e.target.closest && e.target.closest('.mod-btn')) return;
-      selectedModuleId =
-        (String(selectedModuleId) === String(d.id)) ? null : d.id;
-      renderModules();
+      setSelectedModule((String(selectedModuleId) === String(d.id)) ? null : d.id);
       return;
     }
     const el = document.elementFromPoint(e.clientX, e.clientY);
