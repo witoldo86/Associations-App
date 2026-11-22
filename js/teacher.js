@@ -33,6 +33,120 @@
   T.moduleContents = showModuleContents;
   T.removeModule = deleteModule;
 
+  /* =========================================================
+     DIALOGUES RAPIDES DEPUIS LA MAQUETTE (boutons ✎ et ⌗)
+     ========================================================= */
+  const gridNLocal = (v) => { v = Math.floor(Number(v)); return v >= 1 && v <= 4 ? v : 0; };
+  const cloneData = (o) => JSON.parse(JSON.stringify(o));
+
+  function openTextDialog(kind) {
+    const isTitle = kind !== 'subtitle';
+    const c = cfg();
+    const t = c.theme || {};
+    const sizes = isTitle ? App.theme.TITLE_SIZES : App.theme.SUBTITLE_SIZES;
+    const sizeKey = isTitle ? 'titleSize' : 'subtitleSize';
+    const value = isTitle ? (c.title || '') : (c.subtitle || '');
+    const font = App.theme.FONTS[t.font] ? t.font : 'system';
+    const sizeVal = App.theme.resolve(t)[sizeKey];
+    const fontOpts = Object.keys(App.theme.FONTS).map((k) =>
+      '<option value="' + k + '"' + (k === font ? ' selected' : '') + '>' +
+      esc(App.theme.FONTS[k].label) + '</option>').join('');
+    const sizeOpts = Object.keys(sizes).map((k) =>
+      '<option value="' + k + '"' + (k === sizeVal ? ' selected' : '') + '>' +
+      esc(sizes[k].label) + '</option>').join('');
+    App.modal.open({
+      title: isTitle ? 'Modifier le titre' : 'Modifier la consigne',
+      html:
+        '<form id="tx-form" novalidate>' +
+          '<div class="field"><label for="tx-content">' +
+            (isTitle ? 'Titre' : 'Consigne (ce que verra l’élève)') + '</label>' +
+            (isTitle
+              ? '<input id="tx-content" type="text" value="' + esc(value) + '">'
+              : '<textarea id="tx-content" rows="2">' + esc(value) + '</textarea>') + '</div>' +
+          '<div class="inline">' +
+            '<div class="field"><label for="tx-size">Taille</label>' +
+              '<select id="tx-size">' + sizeOpts + '</select></div>' +
+            (isTitle
+              ? '<div class="field field-auto"><label for="tx-color">Couleur</label><span class="inline">' +
+                '<input id="tx-color" type="color" value="' +
+                esc(t.titleColor || t.ink || '#1f2937') + '">' +
+                '<button type="button" class="btn link" id="tx-color-auto">Auto</button></span></div>'
+              : '') +
+            '<div class="field"><label for="tx-font">Police de l’exercice</label>' +
+              '<select id="tx-font">' + fontOpts + '</select></div>' +
+          '</div>' +
+          '<div class="form-actions">' +
+            '<button type="button" class="btn" data-close>Fermer</button>' +
+            '<button type="button" class="btn primary" id="tx-save">Appliquer</button>' +
+          '</div>' +
+        '</form>'
+    });
+    let autoColor = false;
+    const colorInput = document.getElementById('tx-color');
+    if (isTitle) {
+      document.getElementById('tx-color-auto').addEventListener('click', () => {
+        autoColor = true;
+        colorInput.value = t.ink || '#1f2937';
+      });
+      colorInput.addEventListener('input', () => { autoColor = false; });
+    }
+    document.getElementById('tx-save').addEventListener('click', () => {
+      const c2 = cloneData(cfg());
+      const content = String(document.getElementById('tx-content').value).trim();
+      c2.theme = Object.assign({}, c2.theme, {
+        font: document.getElementById('tx-font').value
+      });
+      c2.theme[sizeKey] = document.getElementById('tx-size').value;
+      if (isTitle) {
+        c2.title = content;
+        c2.theme.titleColor = autoColor ? '' : (colorInput.value || '');
+      } else {
+        c2.subtitle = content;
+      }
+      c2.theme = App.theme.resolve(c2.theme);
+      App.state.updateConfig(c2);
+      App.modal.close();
+    });
+    document.getElementById('tx-content').focus();
+  }
+
+  function openGridDialog() {
+    const l = cfg().layout || {};
+    const opts = (cur) => '<option value="0"' + (!cur ? ' selected' : '') +
+        '>Tous sur une ligne</option>' +
+      [1, 2, 3, 4].map((n) => '<option value="' + n + '"' + (cur === n ? ' selected' : '') +
+        '>' + n + ' par ligne</option>').join('');
+    App.modal.open({
+      title: 'Grille des modules',
+      html:
+        '<form id="grid-form" novalidate>' +
+          '<div class="field"><label for="gd-board">Plateau : modules par ligne</label>' +
+            '<select id="gd-board">' + opts(gridNLocal(l.boardCols)) + '</select></div>' +
+          '<div class="field"><label for="gd-pools">Réserves : modules par ligne</label>' +
+            '<select id="gd-pools">' + opts(gridNLocal(l.poolsCols)) + '</select></div>' +
+          '<p class="hint">Le <strong>plateau</strong> est la zone où l’élève dépose ses réponses ; ' +
+            'les <strong>réserves</strong> sont les bacs d’où il pioche les éléments. ' +
+            'Dans chaque ligne, les largeurs réglées avec les poignées sont conservées.</p>' +
+          '<div class="form-actions">' +
+            '<button type="button" class="btn" data-close>Fermer</button>' +
+            '<button type="button" class="btn primary" id="gd-save">Appliquer</button>' +
+          '</div>' +
+        '</form>'
+    });
+    document.getElementById('gd-save').addEventListener('click', () => {
+      const c2 = cloneData(cfg());
+      c2.layout = Object.assign({}, c2.layout, {
+        boardCols: gridNLocal(document.getElementById('gd-board').value),
+        poolsCols: gridNLocal(document.getElementById('gd-pools').value)
+      });
+      App.state.updateConfig(c2);
+      App.modal.close();
+    });
+  }
+
+  T.openTextDialog = openTextDialog;
+  T.openGridDialog = openGridDialog;
+
   T.mount = function (container) {
     root = container;
     root.innerHTML = tpl();

@@ -1152,3 +1152,23 @@ body.student-mode .row.row-multiline{ grid-template-columns:2rem minmax(0,1fr); 
   .row-line{ gap:.3rem; }
   .row-lines{ gap:.3rem; }
 }
+
+/* =========================================================
+   ÉDITION DEPUIS L'APERÇU (✎ titres, ⌗ grille) + RÉSERVES PLUS LISIBLES
+   ========================================================= */
+.mq-edit{
+  border:1px solid var(--line); border-radius:6px; background:#fff;
+  width:1.3rem; height:1.3rem; line-height:1; font-size:.75rem;
+  color:var(--muted); cursor:pointer; padding:0; flex:0 0 auto;
+  text-transform:none; letter-spacing:normal;
+}
+.mq-edit:hover{ border-color:var(--primary,#2563eb); color:var(--primary,#2563eb); background:#eff6ff; }
+.mq-title .mq-edit, .mq-subtitle .mq-edit{ opacity:.6; }
+.mq-add{ width:1.4rem; height:1.4rem; font-size:.95rem; }
+.mq-pools-title{ display:flex; align-items:center; gap:.35rem; }
+.mq-zone.mq-pools{ min-height:76px; }
+.mq-mini{ font-size:.8rem; min-height:2.1rem; padding:.3rem .45rem; }
+.mq-mini .mq-act{ font-size:.9rem; }
+.mq-act{ font-size:.85rem; }
+.mq-mini-pools{ gap:.35rem; }
+.mq-mrow{ gap:.35rem; }

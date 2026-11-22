@@ -151,7 +151,8 @@
       <p class="hint">
         Tout se pilote ici : glissez les modules pour les déplacer ou les réordonner,
         ajoutez-en avec le bouton <strong>＋</strong> de chaque zone, éditez/visualisez/supprimez
-        avec <strong>✎ 📄 🗑</strong> au survol des blocs. Chaque réglage est
+        avec <strong>✎ 📄 🗑</strong> au survol des blocs, modifiez le titre, la consigne
+        et la grille avec les boutons <strong>✎</strong> et <strong>⌗</strong> de l'aperçu. Chaque réglage est
         <strong>enregistré automatiquement</strong> (indicateur en haut à droite) et aussitôt
         visible dans les espaces élève et prof.
       </p>
@@ -240,6 +241,16 @@
       else if (act.dataset.mqAct === 'del') A.removeModule(id);
       return;
     }
+    const dlg = e.target.closest('[data-mq-dialog]');
+    if (dlg) {
+      e.preventDefault();
+      e.stopPropagation();
+      const k = dlg.dataset.mqDialog;
+      if (!App.teacher) return;
+      if (k === 'grid') App.teacher.openGridDialog();
+      else App.teacher.openTextDialog(k);
+      return;
+    }
     const addBtn = e.target.closest('[data-mq-add]');
     if (addBtn) {
       e.preventDefault();
@@ -293,6 +304,12 @@
 
   const RESIZER = '<div class="mq-resizer" title=""></div>';
 
+  // Petits boutons d'édition placés dans l'aperçu (✎ textes, ⌗ grille)
+  const editBtn = (kind, label) =>
+    '<button type="button" class="mq-edit" data-mq-dialog="' + kind + '" title="' + label + '">✎</button>';
+  const GRID_BTN = '<button type="button" class="mq-edit" data-mq-dialog="grid" ' +
+    'title="Grille : modules par ligne (plateau et réserves)">⌗</button>';
+
   function moduleChip(m, showWidth) {
     const span = Number(m.span) || 1;
     const style = showWidth
@@ -308,11 +325,11 @@
       chipActions(m.id) + '</div>';
   }
 
-  function zoneHtml(name, title, inner, cls, itemsAttr) {
+  function zoneHtml(name, title, inner, cls, itemsAttr, labelExtra) {
     const plus = ADD_ZONE[name]
       ? '<button type="button" class="mq-add" data-mq-add="' + ADD_ZONE[name] + '" title="Ajouter un module">＋</button>' : '';
     return '<div class="mq-zone ' + (cls || '') + '" data-zone="' + name + '">' +
-      '<div class="mq-zone-label">' + title + plus + '</div>' +
+      '<div class="mq-zone-label">' + title + plus + (labelExtra || '') + '</div>' +
       '<div class="mq-zone-items"' + (itemsAttr || '') + '>' + (inner || '<span class="mq-empty">Déposez ici</span>') + '</div>' +
       '</div>';
   }
@@ -379,17 +396,20 @@
       ? chunkOf(assoc, bc).map((g) =>
           '<div class="mq-mrow">' + g.map((m) => moduleChip(m, true)).join(RESIZER) + '</div>').join('')
       : assoc.map((m) => moduleChip(m, true)).join(RESIZER);
-    const poolsZone = (name, side) => zoneHtml(name, 'Réserves', draft.poolsSide === side ? poolsChip : '', 'mq-pools');
+    const poolsZone = (name, side) => zoneHtml(name, 'Réserves',
+      draft.poolsSide === side ? poolsChip : '', 'mq-pools', '', GRID_BTN);
 
     $('#mq-preview').innerHTML =
       '<div class="mq-screen" style="' + esc(style) + '">' +
-        '<div class="mq-title">' + esc(draft.title || 'Titre') + '</div>' +
-        '<div class="mq-subtitle">' + esc(draft.subtitle) + '</div>' +
+        '<div class="mq-title">' + esc(draft.title || 'Titre') +
+          editBtn('title', 'Modifier le titre (texte, taille, couleur, police)') + '</div>' +
+        '<div class="mq-subtitle">' + esc(draft.subtitle) +
+          editBtn('subtitle', 'Modifier la consigne (texte, taille, police)') + '</div>' +
         poolsZone('pools-top', 'top') +
         '<div class="mq-main">' +
           zoneHtml('left', 'Panneau gauche', inZone('left').map(moduleChip).join(''), 'mq-side') +
           zoneHtml('columns', 'Plateau — colonnes à associer (dans l\'ordre)',
-            boardInner, 'mq-board') +
+            boardInner, 'mq-board', '', GRID_BTN) +
           zoneHtml('right', 'Panneau droit', inZone('right').map(moduleChip).join(''), 'mq-side') +
         '</div>' +
         poolsZone('pools-bottom', 'bottom') +
