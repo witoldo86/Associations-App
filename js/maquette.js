@@ -71,7 +71,8 @@
         <div class="field"><label for="mq-poolscols">Réserves : modules par ligne</label>
           <select id="mq-poolscols" data-mq="poolsCols">${gridOptions()}</select></div>
         <p class="hint">Avec « Tous sur une ligne », les largeurs se règlent à la main dans l'aperçu.
-          Avec une grille, les colonnes ont toutes la même largeur et le contenu s'adapte à celle-ci.</p>
+          Une grille ne passe sur plusieurs lignes qu'à partir du moment où sa valeur dépasse le
+          nombre de modules : tant qu'elle tient sur une ligne, les largeurs restent réglables.</p>
       </fieldset>
 
       <fieldset class="mq-group">
@@ -290,7 +291,11 @@
       '</div></div></div>';
 
     // Plateau : grille de N colonnes égales, ou une ligne avec séparateurs de largeur
-    const bc = gridCols(draft.boardCols, assoc.length);
+    // Si la grille tient de toute façon sur une ligne (N >= nb de modules à associer),
+    // on garde les largeurs manuelles et les séparateurs : les deux réglages donnent
+    // le même rendu, mais un seul laisse le redimensionnement possible.
+    const bcDraft = gridCols(draft.boardCols, assoc.length);
+    const bc = (bcDraft && bcDraft >= assoc.length) ? 0 : bcDraft;
     const boardChips = assoc.map((m) => moduleChip(m, true)).join(bc ? '' : RESIZER);
     const boardAttr = bc ? ' style="display:grid;grid-template-columns:repeat(' + bc + ',minmax(0,1fr))"' : '';
     const poolsZone = (name, side) => zoneHtml(name, 'Réserves', draft.poolsSide === side ? poolsChip : '', 'mq-pools');

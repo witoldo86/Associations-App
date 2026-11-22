@@ -30,11 +30,16 @@
   // Modules par ligne : 0 = tous sur une ligne (largeurs réglables), sinon 1 à 4
   const gridN = (v) => { v = Math.floor(Number(v)); return v >= 1 && v <= 4 ? v : 0; };
 
-  /** Plan de grille : nombre de colonnes, modèle CSS et nombre de lignes occupées par module. */
-  function gridPlan(mods, perLine) {
+  /** Plan de grille : nombre de colonnes, modèle CSS et nombre de lignes occupées par module.
+   *  Avec spanMode (plateau) : si la grille tient de toute façon sur une ligne,
+   *  on revient aux largeurs manuelles (span) pour rester cohérent avec l'aperçu prof. */
+  function gridPlan(mods, perLine, spanMode) {
     const n = gridN(perLine);
     if (!n) return { cols: mods.length || 1, tpl: colsTpl(mods), lines: 1 };
     const cols = Math.max(1, Math.min(n, mods.length));
+    if (spanMode && cols >= mods.length) {
+      return { cols: mods.length || 1, tpl: colsTpl(mods), lines: 1 };
+    }
     return { cols, tpl: 'repeat(' + cols + ',minmax(0,1fr))', lines: Math.max(1, Math.ceil(mods.length / cols)) };
   }
 
@@ -226,7 +231,7 @@
     });
     updatePreviewButtons();
 
-    const boardPlan = gridPlan(mods, cfg().layout && cfg().layout.boardCols);
+    const boardPlan = gridPlan(mods, cfg().layout && cfg().layout.boardCols, true);
     const multi = boardPlan.lines > 1;
     let html = '';
     for (let r = 0; r < rows.length; r++) {
