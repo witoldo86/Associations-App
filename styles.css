@@ -1070,6 +1070,31 @@ body.student-mode .pool{
 }
 
 /* =========================================================
+   BACS « INTELLIGENTS » (vue élève)
+   - Chaque élément du bac remplit la ligne : pas de vide horizontal.
+   - Chaque élément est son propre conteneur : le contenu (texte, images)
+     se dimensionne sur la largeur RÉELLE de l'élément — donc plus petit
+     quand la ligne est partagée, plus grand quand il est seul.
+   - Grille imposée par le prof : --pool-cols éléments par ligne,
+     contenus adaptés à la largeur de cellule.
+   ========================================================= */
+.pool > .item{ flex:1 1 auto; min-width:0; }
+body.student-mode .pool > .item{
+  container-type:inline-size; container-name:poolcell;
+}
+@container poolcell (min-width:0){
+  body.student-mode .pool .item-text,
+  body.student-mode .pool .item-info{
+    font-size:clamp(.7rem, 9cqw, 1.1rem);
+  }
+}
+.pool.is-gridded{
+  display:grid; grid-template-columns:repeat(var(--pool-cols,1),minmax(0,1fr));
+  align-content:start;
+}
+.pool.is-gridded > .item{ flex:none; width:100%; max-width:100%; }
+
+/* =========================================================
    GRILLE DES MODULES (N par ligne) — élève et maquette
    ========================================================= */
 /* Réserves sur plusieurs lignes : toutes les lignes ont la même hauteur */

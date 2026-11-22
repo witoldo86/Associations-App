@@ -126,7 +126,7 @@
               </svg>
             </button>
           </h3>
-          <div class="pool" data-pool-module="${esc(m.id)}" id="pool-${esc(m.id)}"></div>
+          <div class="pool${m.poolCols ? ' is-gridded' : ''}" data-pool-module="${esc(m.id)}" id="pool-${esc(m.id)}"${m.poolCols ? ' style="--pool-cols:' + Number(m.poolCols) + '"' : ''}></div>
         </div>`).join('') +
       '</div>';
     expandedModuleId = null;

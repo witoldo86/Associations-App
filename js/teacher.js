@@ -412,6 +412,13 @@
             <option value="informative" ${m&&m.role==='informative'?'selected':''}>Informatif (panneau latéral)</option>
           </select>
         </div>
+        <div class="field">
+          <label>Éléments par ligne dans le bac (réserve)</label>
+          <select id="mf-poolcols">
+            <option value="" ${!(m&&m.poolCols)?'selected':''}>Auto — ils remplissent la largeur du bac</option>
+            ${[1,2,3,4].map((n) => '<option value="' + n + '" ' + (m && m.poolCols === n ? 'selected' : '') + '>' + n + ' par ligne (contenu adapté)</option>').join('')}
+          </select>
+        </div>
       </div>
       <div class="field">
         <label>Verrouillage pédagogique (optionnel)</label>
@@ -491,7 +498,8 @@
       alert('Cet identifiant existe déjà.'); return;
     }
 
-    const payload = { id, label, kind, role, unlockAfter };
+    const poolColsRaw = document.getElementById('mf-poolcols').value;
+    const payload = { id, label, kind, role, unlockAfter, poolCols: poolColsRaw ? Number(poolColsRaw) : null };
 
     if (isNew) {
       c.modules.push(payload);
