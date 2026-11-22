@@ -154,9 +154,9 @@
       <input id="mf-zone" type="hidden" value="${zoneOk ? esc(zone) : ''}">
       <div class="inline">
         <div class="field">
-          <label>Identifiant (court, sans espace)</label>
+          <label>Identifiant technique (facultatif — déduit du libellé si vide)</label>
           <input id="mf-id" type="text" value="${esc(m?m.id:'')}" ${isNew?'':'readonly'}
-                 placeholder="ex. son, date, lieu" pattern="[a-zA-Z0-9_\\-]+">
+                 placeholder="généré automatiquement" pattern="[a-zA-Z0-9_\\-]+">
         </div>
         <div class="field">
           <label>Libellé (affiché à l'élève)</label>
@@ -244,23 +244,35 @@
     return targetType.createEmpty();
   }
 
+  /* Identifiant technique déduit du libellé, sans accents ni espaces. */
+  function slugFromLabel(label) {
+    const s = String(label).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9_-]+/g, '-').replace(/-{2,}/g, '-').replace(/^-+|-+$/g, '');
+    return s || 'module';
+  }
+
   function saveModule() {
-    const id = document.getElementById('mf-id').value.trim();
+    const rawId = document.getElementById('mf-id').value.trim();
     const label = document.getElementById('mf-label').value.trim();
     const kind = document.getElementById('mf-kind').value;
     const role = document.getElementById('mf-role').value;
     const unlockAfter = [...document.querySelectorAll('input[data-unlock]:checked')]
       .map((x) => x.dataset.unlock);
 
-    if (!id) { alert('Identifiant obligatoire.'); return; }
+    if (!label) { alert('Donnez un libellé au module (ce que verra l\'élève).'); return; }
+
+    let id = rawId;
+    if (!id) id = slugFromLabel(label);
     if (!/^[a-zA-Z0-9_\-]+$/.test(id)) { alert('Identifiant : lettres, chiffres, _ et - uniquement.'); return; }
-    if (!label) { alert('Libellé obligatoire.'); return; }
 
     const c = cfg();
     const isNew = !editingModuleId;
 
     if (isNew && c.modules.some((m) => m.id === id)) {
-      alert('Cet identifiant existe déjà.'); return;
+      if (rawId) { alert('Cet identifiant existe déjà.'); return; }
+      let n = 2;
+      while (c.modules.some((m) => m.id === id + '-' + n)) n++;
+      id = id + '-' + n;
     }
 
     const poolColsRaw = document.getElementById('mf-poolcols').value;
