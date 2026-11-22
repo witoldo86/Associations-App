@@ -26,7 +26,9 @@
   // Modules par ligne : 0 = tous sur une ligne (largeurs réglables), sinon 1 à 4
   const gridN = (v) => { v = Math.floor(Number(v)); return v >= 1 && v <= 4 ? v : 0; };
   const gridCols = (n, total) => (n ? Math.max(1, Math.min(n, total)) : 0);
+  // Largeurs manuelles indépendantes : plateau (span) et réserves (poolSpan)
   const spanOf = (m) => Math.max(0.5, Number(m.span) || 1);
+  const poolSpanOf = (m) => Math.max(0.5, Number(m.poolSpan) || 1);
 
   /* =========================================================
      BROUILLON
@@ -288,7 +290,7 @@
     const poolParts = [];
     assoc.forEach((m, i) => {
       if (i && poolsOneLine) poolParts.push('9px');
-      poolParts.push('minmax(0,' + spanOf(m) + 'fr)');
+      poolParts.push('minmax(0,' + poolSpanOf(m) + 'fr)');
     });
     const poolsTpl = pc ? 'repeat(' + pc + ',minmax(0,1fr))' : poolParts.join(' ');
     const poolsChip = '<div class="mq-chip mq-chip-pools" data-drag-kind="pools" data-drag-id="pools">' +
@@ -402,15 +404,17 @@
       x.id === (el.dataset.dragId || el.dataset.spanId));
     const mods = [left, right].map(modulesOf);
     if (mods.some((m) => !m)) return;
+    const isPools = sep.parentNode.classList &&
+      sep.parentNode.classList.contains('mq-mini-pools');
+    const wKey = isPools ? 'poolSpan' : 'span';
+    const widths = mods.map((m) => Math.max(0.5, Number(m[wKey]) || 1));
     const lr = left.getBoundingClientRect();
     const rr = right.getBoundingClientRect();
     rz = {
-      chips: [left, right], mods,
-      spans: mods.map((m) => Number(m.span) || 1),
-      pxPerSpan: (lr.width + rr.width) /
-                 ((Number(mods[0].span) || 1) + (Number(mods[1].span) || 1)),
-      grid: (sep.parentNode.classList && sep.parentNode.classList.contains('mq-mini-pools'))
-        ? sep.parentNode : null,
+      chips: [left, right], mods, wKey,
+      spans: widths,
+      pxPerSpan: (lr.width + rr.width) / (widths[0] + widths[1]),
+      grid: isPools ? sep.parentNode : null,
       startX: e.clientX
     };
     window.addEventListener('pointermove', onResizeMove);
@@ -427,10 +431,12 @@
     let a = clampSpan(rz.spans[0] + delta);
     a = Math.min(a, Math.max(0.5, pair - 0.5));
     let b = clampSpan(pair - a);
-    rz.mods[0].span = a;
-    rz.mods[1].span = b;
-    if (rz.chips[0]) rz.chips[0].style.flexGrow = a;
-    if (rz.chips[1]) rz.chips[1].style.flexGrow = b;
+    rz.mods[0][rz.wKey] = a;
+    rz.mods[1][rz.wKey] = b;
+    if (rz.wKey === 'span') {
+      if (rz.chips[0]) rz.chips[0].style.flexGrow = a;
+      if (rz.chips[1]) rz.chips[1].style.flexGrow = b;
+    }
     if (rz.grid) syncMiniTemplate(rz.grid);
   }
 
@@ -439,7 +445,7 @@
     container.style.gridTemplateColumns = [...container.children].map((el) => {
       if (el.classList.contains('mq-resizer')) return '9px';
       const m = draft.modules.find((x) => x.id === el.dataset.spanId);
-      return 'minmax(0,' + spanOf(m || {}) + 'fr)';
+      return 'minmax(0,' + poolSpanOf(m || {}) + 'fr)';
     }).join(' ');
   }
 

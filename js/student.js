@@ -24,8 +24,9 @@
   const infoMods = () => cfg().modules.filter((m) => m.role === 'informative');
   const modLabel = (m) => m.label || m.id;
   const cssId = (id) => CSS.escape(String(id));
-  const colsTpl = (mods) => mods.map((m) =>
-    'minmax(0,' + (Math.max(0.5, Number(m.span) || 1)) + 'fr)').join(' ');
+  // Largeurs manuelles indépendantes : plateau (span) et réserves (poolSpan)
+  const colsTpl = (mods, wKey) => mods.map((m) =>
+    'minmax(0,' + (Math.max(0.5, Number(m[wKey]) || 1)) + 'fr)').join(' ');
 
   // Modules par ligne : 0 = tous sur une ligne (largeurs réglables), sinon 1 à 4
   const gridN = (v) => { v = Math.floor(Number(v)); return v >= 1 && v <= 4 ? v : 0; };
@@ -33,12 +34,12 @@
   /** Plan de grille : nombre de colonnes, modèle CSS et nombre de lignes occupées par module.
    *  Avec spanMode (plateau) : si la grille tient de toute façon sur une ligne,
    *  on revient aux largeurs manuelles (span) pour rester cohérent avec l'aperçu prof. */
-  function gridPlan(mods, perLine, spanMode) {
+  function gridPlan(mods, perLine, wKey) {
     const n = gridN(perLine);
-    if (!n) return { cols: mods.length || 1, tpl: colsTpl(mods), lines: 1 };
+    if (!n) return { cols: mods.length || 1, tpl: colsTpl(mods, wKey), lines: 1 };
     const cols = Math.max(1, Math.min(n, mods.length));
-    if (spanMode && cols >= mods.length) {
-      return { cols: mods.length || 1, tpl: colsTpl(mods), lines: 1 };
+    if (wKey && cols >= mods.length) {
+      return { cols: mods.length || 1, tpl: colsTpl(mods, wKey), lines: 1 };
     }
     return { cols, tpl: 'repeat(' + cols + ',minmax(0,1fr))', lines: Math.max(1, Math.ceil(mods.length / cols)) };
   }
@@ -107,7 +108,7 @@
 
     const zone = $('#s-pools-zone');
     zone.classList.remove('has-expanded-module');
-    const poolPlan = gridPlan(mods, c.layout && c.layout.poolsCols, true);
+    const poolPlan = gridPlan(mods, c.layout && c.layout.poolsCols, 'poolSpan');
     zone.innerHTML =
      '<div class="pools' + (poolPlan.lines > 1 ? ' pools-multiline' : '') +
       '" style="--cols:' + poolPlan.cols + ';--cols-tpl:' + poolPlan.tpl + '">' +
@@ -231,7 +232,7 @@
     });
     updatePreviewButtons();
 
-    const boardPlan = gridPlan(mods, cfg().layout && cfg().layout.boardCols, true);
+    const boardPlan = gridPlan(mods, cfg().layout && cfg().layout.boardCols, 'span');
     const multi = boardPlan.lines > 1;
     let html = '';
     for (let r = 0; r < rows.length; r++) {
