@@ -945,7 +945,22 @@ body.student-mode #s-pools-zone.has-expanded-module .pool-col.is-expanded .pool{
 .mq-zone-label{
   font-size:.66rem; text-transform:uppercase; letter-spacing:.05em;
   color:var(--muted); margin-bottom:.3rem;
+  display:flex; align-items:center; gap:.35rem; min-height:1.4rem;
 }
+.mq-add{
+  border:1px solid var(--line); border-radius:50%; background:#fff;
+  width:1.25rem; height:1.25rem; line-height:1; font-size:.85rem;
+  color:var(--muted); cursor:pointer; padding:0;
+}
+.mq-add:hover{ border-color:var(--primary); color:var(--primary, #2563eb); }
+.mq-acts{ display:inline-flex; gap:.15rem; margin-left:.15rem; opacity:0; transition:opacity .12s; }
+.mq-chip:hover .mq-acts, .mq-mini:hover .mq-acts, .mq-chip:focus-within .mq-acts{ opacity:1; }
+.mq-act{
+  border:0; background:transparent; cursor:pointer; padding:0 .12rem;
+  font-size:.72rem; line-height:1; color:var(--muted); border-radius:4px;
+}
+.mq-act:hover{ background:#eff6ff; }
+.mq-act.danger:hover{ background:#fee2e2; }
 .mq-zone-items{ display:flex; flex-wrap:wrap; gap:.35rem; }
 .mq-empty{ color:#b6bfcc; font-size:.78rem; }
 .mq-board{ border-style:solid; border-color:var(--primary); }
@@ -1113,4 +1128,10 @@ body.student-mode .pool > .item{
   border:1px dashed #cbd5e1; border-radius:6px; background:#fafbfc;
   padding:.2rem .3rem; font-size:.7rem; text-align:center; min-height:1.6rem;
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  display:inline-flex; align-items:center; justify-content:center; gap:.2rem;
+  cursor:grab; user-select:none; touch-action:none;
 }
+.mq-mini:hover{ border-color:var(--primary, #2563eb); }
+.mq-mini:hover{ overflow:visible; flex-wrap:wrap; white-space:normal; }
+.mq-mini .mq-acts{ opacity:0; }
+.mq-mini.dragging{ opacity:.3; }

@@ -8,7 +8,6 @@
   let editingRowId = null;
   let selectedRowId = null;
   let editingModuleId = null;
-  let selectedModuleId = null;
   let editingCellCtx = null;
   let flattenedRowIds = new Set();
 
@@ -28,6 +27,12 @@
   /* =========================================================
      MONTAGE
      ========================================================= */
+  /* Gestion des modules pilotée depuis la maquette (js/maquette.js) */
+  T.addModule = function (zone) { startAddModule(zone); };
+  T.editModule = startEditModule;
+  T.moduleContents = showModuleContents;
+  T.removeModule = deleteModule;
+
   T.mount = function (container) {
     root = container;
     root.innerHTML = tpl();
@@ -42,7 +47,6 @@
     <div class="teacher">
       <section class="panel" id="maquette-panel"></section>
       ${panelConfig()}
-      ${panelModules()}
       ${panelRows()}
     </div>`;
   }
@@ -96,128 +100,6 @@
   /* =========================================================
      PANNEAU MODULES
      ========================================================= */
-  function panelModules() {
-    return `
-    <section class="panel">
-      <div class="panel-head">
-        <h2>Modules <span class="badge" id="mod-count">0</span></h2>
-        <div class="tools">
-          <button type="button" class="btn primary" id="mod-add">+ Nouveau module</button>
-        </div>
-      </div>
-      <div class="list-toolbar" id="mod-toolbar">
-        <span class="hint" id="mod-sel-hint">Cliquez sur un module pour le sélectionner · double-cliquez pour l'éditer · glissez-le pour changer l'ordre</span>
-        <div class="list-toolbar-actions">
-          <button type="button" class="btn small" data-mod-tool="up" disabled>↑</button>
-          <button type="button" class="btn small" data-mod-tool="down" disabled>↓</button>
-          <button type="button" class="btn small" data-mod-tool="view" disabled title="Contenus déjà utilisés">📄</button>
-          <button type="button" class="btn small primary" data-mod-tool="edit" disabled>✎</button>
-          <button type="button" class="btn small danger" data-mod-tool="del" disabled>🗑</button>
-        </div>
-      </div>
-      <p class="hint">
-        Un module <strong>« à associer »</strong> devient une colonne du plateau.
-        Un module <strong>« informatif »</strong> s'affiche en panneau latéral.
-      </p>
-      <div class="mod-strip" id="mod-list"></div>
-    </section>`;
-  }
-
-  /* Sélection mise à jour en place (classe CSS) : reconstruire le HTML remplacerait
-     les nœuds et ferait retomber le dblclick du double-clic sur la liste, pas sur le bloc. */
-  function setSelectedModule(id) {
-    selectedModuleId = id;
-    $$('.mod-block').forEach((b) =>
-      b.classList.toggle('selected', String(b.dataset.moduleId) === String(selectedModuleId)));
-    updateModToolbar();
-  }
-
-  function renderModules() {
-    const mods = allMods();
-    $('#mod-count').textContent = mods.length;
-    $('#mod-list').innerHTML = mods.map((m) => {
-      const kind = App.schema.kindInfo(m.kind);
-      const role = m.role === 'informative' ? 'Informatif' : 'À associer';
-      const sel = String(m.id) === String(selectedModuleId);
-      const lock = (m.unlockAfter && m.unlockAfter.length)
-        ? `<span class="lock-badge lock-inline" title="Verrou pédagogique actif">🔒</span>`
-        : '';
-      return `
-        <div class="mod-block${sel ? ' selected' : ''}" data-module-id="${esc(m.id)}"
-             title="${esc(m.id)}">
-          <div class="mod-actions">
-            <button type="button" class="mod-btn" data-mod-act="view"
-                    title="Visualiser le contenu du module">📄</button>
-            <button type="button" class="mod-btn danger" data-mod-act="del"
-                    title="Supprimer ce module">🗑️</button>
-          </div>
-          <div class="mod-name">${esc(m.label || m.id)}</div>
-          <div class="mod-kinds">
-            <span class="badge">${esc(kind ? kind.label : m.kind)}</span>
-            <span class="badge">${esc(role)}</span>
-            ${lock}
-          </div>
-        </div>`;
-    }).join('');
-    updateModToolbar();
-  }
-
-  function updateModToolbar() {
-    const mods = allMods();
-    const idx = mods.findIndex((m) => String(m.id) === String(selectedModuleId));
-    const has = idx !== -1;
-    const hint = $('#mod-sel-hint');
-    if (!has) hint.textContent = 'Cliquez sur un module pour le sélectionner · double-cliquez pour l\'éditer · glissez-le pour changer l\'ordre';
-    else hint.textContent = 'Sélection : ' + (mods[idx].label || mods[idx].id);
-    $('[data-mod-tool="up"]').disabled = !has || idx === 0;
-    $('[data-mod-tool="down"]').disabled = !has || idx === mods.length - 1;
-    $('[data-mod-tool="view"]').disabled = !has;
-    $('[data-mod-tool="edit"]').disabled = !has;
-    $('[data-mod-tool="del"]').disabled = !has;
-  }
-
-  function onModToolbarClick(e) {
-    const btn = e.target.closest('button[data-mod-tool]');
-    if (!btn || btn.disabled || !selectedModuleId) return;
-    const act = btn.dataset.modTool;
-    const c = cfg();
-    const i = c.modules.findIndex((m) => String(m.id) === String(selectedModuleId));
-    if (i < 0) { selectedModuleId = null; renderModules(); return; }
-
-    if (act === 'up' && i > 0) {
-      [c.modules[i - 1], c.modules[i]] = [c.modules[i], c.modules[i - 1]];
-      App.state.updateConfig(c);
-    } else if (act === 'down' && i < c.modules.length - 1) {
-      [c.modules[i], c.modules[i + 1]] = [c.modules[i + 1], c.modules[i]];
-      App.state.updateConfig(c);
-    } else if (act === 'view') {
-      showModuleContents(selectedModuleId);
-    } else if (act === 'edit') {
-      startEditModule(selectedModuleId);
-    } else if (act === 'del') {
-      deleteModule(selectedModuleId);
-    }
-  }
-
-  function onModListClick(e) {
-    const btn = e.target.closest('button[data-mod-act]');
-    if (!btn) return;
-    const block = btn.closest('.mod-block');
-    if (!block) return;
-    e.stopPropagation();
-    const id = block.dataset.moduleId;
-    if (btn.dataset.modAct === 'view') showModuleContents(id);
-    else if (btn.dataset.modAct === 'del') deleteModule(id);
-  }
-
-  function onModListDblClick(e) {
-    const block = e.target.closest('.mod-block');
-    if (!block || e.target.closest('.mod-btn')) return;
-    const id = block.dataset.moduleId;
-    setSelectedModule(id);
-    startEditModule(id);
-  }
-
   function deleteModule(id) {
     const c = cfg();
     const mod = c.modules.find((m) => String(m.id) === String(id));
@@ -229,143 +111,15 @@
         m.unlockAfter = m.unlockAfter.filter((x) => String(x) !== String(id));
       }
     });
-    if (String(selectedModuleId) === String(id)) selectedModuleId = null;
     App.state.updateConfig(c);
-  }
-
-  /* =========================================================
-     RÉORDONNANCEMENT DES MODULES PAR GLISSER-DÉPOSER
-     ========================================================= */
-  let modDrag = null;
-
-  function onModPointerDown(e) {
-    const el = e.target.closest('.mod-block');
-    if (!el) return;
-    if (e.pointerType === 'mouse' && e.button !== 0) return;
-    modDrag = {
-      id: el.dataset.moduleId, el,
-      startX: e.clientX, startY: e.clientY,
-      dragging: false, ghost: null, offX: 0, offY: 0
-    };
-    window.addEventListener('pointermove', onModPointerMove);
-    window.addEventListener('pointerup', onModPointerUp);
-    window.addEventListener('pointercancel', onModPointerCancel);
-  }
-
-   let modDragFrame = null;
-  let modHoverId = null;
-
-  function onModPointerMove(e) {
-    if (!modDrag) return;
-    if (!modDrag.dragging &&
-        Math.hypot(e.clientX - modDrag.startX, e.clientY - modDrag.startY) > 6) {
-      beginModDrag(e);
-    }
-    if (!modDrag.dragging) return;
-
-    // Position du fantôme : direct, léger (transform = GPU)
-    modDrag.cx = e.clientX;
-    modDrag.cy = e.clientY;
-    moveModGhost(e);
-
-    // Détection de la cible : au plus une fois par frame, sans travail inutile
-    if (modDragFrame) return;
-    modDragFrame = requestAnimationFrame(() => {
-      modDragFrame = null;
-      if (!modDrag || !modDrag.dragging) return;
-      const t = document.elementFromPoint(modDrag.cx, modDrag.cy);
-      const block = t && t.closest('.mod-block');
-      const hoverId = (block && block.dataset.moduleId !== modDrag.id)
-        ? block.dataset.moduleId : null;
-      if (hoverId !== modHoverId) {          // ne touche au DOM que si la cible change
-        clearModHighlight();
-        modHoverId = hoverId;
-        if (block) block.classList.add('drop-target');
-      }
-    });
-  }
-
-  function beginModDrag(e) {
-    const rect = modDrag.el.getBoundingClientRect();
-    modDrag.offX = modDrag.startX - rect.left;
-    modDrag.offY = modDrag.startY - rect.top;
-    modDrag.dragging = true;
-    const ghost = modDrag.el.cloneNode(true);
-    ghost.classList.add('mod-ghost');
-    ghost.style.left = '0px';
-    ghost.style.top = '0px';
-    ghost.style.width = rect.width + 'px';
-    document.body.appendChild(ghost);
-    modDrag.ghost = ghost;
-    modDrag.el.classList.add('mod-dragging');
-    moveModGhost(e);
-  }
-
-  function moveModGhost(e) {
-    if (!modDrag || !modDrag.ghost) return;
-    const x = e ? e.clientX : modDrag.cx;
-    const y = e ? e.clientY : modDrag.cy;
-    modDrag.ghost.style.transform =
-      'translate(' + (x - modDrag.offX) + 'px, ' +
-                     (y - modDrag.offY) + 'px) rotate(-2deg)';
-  }
-
-  function clearModHighlight() {
-    document.querySelectorAll('.mod-block.drop-target')
-      .forEach((n) => n.classList.remove('drop-target'));
-  }
-
-  function cleanupModDrag(d) {
-    if (d.ghost && d.ghost.parentNode) d.ghost.parentNode.removeChild(d.ghost);
-    if (d.el) d.el.classList.remove('mod-dragging');
-    clearModHighlight();
-    d.ghost = null;
-  }
-
-   function endModListeners() {
-    window.removeEventListener('pointermove', onModPointerMove);
-    window.removeEventListener('pointerup', onModPointerUp);
-    window.removeEventListener('pointercancel', onModPointerCancel);
-    if (modDragFrame) { cancelAnimationFrame(modDragFrame); modDragFrame = null; }
-    modHoverId = null;
-  }
-
-  function onModPointerUp(e) {
-    endModListeners();
-    if (!modDrag) return;
-    const d = modDrag; modDrag = null;
-    if (!d.dragging) {
-      if (e.target && e.target.closest && e.target.closest('.mod-btn')) return;
-      setSelectedModule((String(selectedModuleId) === String(d.id)) ? null : d.id);
-      return;
-    }
-    const el = document.elementFromPoint(e.clientX, e.clientY);
-    const block = el && el.closest('.mod-block');
-    cleanupModDrag(d);
-    if (!block || block.dataset.moduleId === d.id) return;
-    const rect = block.getBoundingClientRect();
-    const after = e.clientX > rect.left + rect.width / 2;
-    const c = cfg();
-    const from = c.modules.findIndex((m) => m.id === d.id);
-    if (from < 0) return;
-    const [m] = c.modules.splice(from, 1);
-    let to = c.modules.findIndex((mm) => mm.id === block.dataset.moduleId);
-    if (to < 0) { c.modules.splice(from, 0, m); return; }
-    c.modules.splice(to + (after ? 1 : 0), 0, m);
-    App.state.updateConfig(c);
-  }
-
-  function onModPointerCancel() {
-    endModListeners();
-    if (modDrag) { cleanupModDrag(modDrag); modDrag = null; }
   }
 
   /* =========================================================
      FORMULAIRE MODULE — dans une MODAL
      ========================================================= */
-  function startAddModule() {
+  function startAddModule(zone) {
     editingModuleId = null;
-    openModuleModal(null);
+    openModuleModal(null, zone);
   }
 
   function startEditModule(id) {
@@ -375,24 +129,29 @@
     openModuleModal(m);
   }
 
-  function openModuleModal(m) {
+  function openModuleModal(m, zone) {
     App.modal.open({
       title: m ? 'Modifier le module : ' + (m.label || m.id) : 'Nouveau module',
-      html: moduleFormHtml(m)
+      html: moduleFormHtml(m, zone)
     });
     const idInput = document.getElementById('mf-id');
     if (idInput && !idInput.readOnly) idInput.focus();
     bindModuleForm();
   }
 
-  function moduleFormHtml(m) {
+  function moduleFormHtml(m, zone) {
     const isNew = !m;
     const kinds = Object.entries(App.schema.Types);
     const others = allMods().filter((x) => !m || x.id !== m.id);
     const unlockSet = new Set((m && m.unlockAfter) || []);
+    /* Zone présélectionnée quand l'ajout part de la maquette : « à associer »
+       (plateau, réserve) ou « informatif » (panneau gauche/droit, masqué). */
+    const zoneOk = isNew && ['columns', 'pools', 'left', 'right', 'hidden'].indexOf(zone) !== -1;
+    const presetRole = zoneOk ? (zone === 'columns' || zone === 'pools' ? 'associate' : 'informative') : null;
 
     return `
     <form id="module-form" novalidate>
+      <input id="mf-zone" type="hidden" value="${zoneOk ? esc(zone) : ''}">
       <div class="inline">
         <div class="field">
           <label>Identifiant (court, sans espace)</label>
@@ -414,8 +173,8 @@
         <div class="field">
           <label>Rôle</label>
           <select id="mf-role">
-            <option value="associate"   ${!m||m.role==='associate'?'selected':''}>À associer (colonne du plateau)</option>
-            <option value="informative" ${m&&m.role==='informative'?'selected':''}>Informatif (panneau latéral)</option>
+            <option value="associate" ${presetRole ? presetRole==='associate' ? 'selected' : '' : (!m||m.role==='associate'?'selected':'')}>À associer (colonne du plateau)</option>
+            <option value="informative" ${presetRole ? presetRole==='informative' ? 'selected' : '' : (m&&m.role==='informative'?'selected':'')}>Informatif (panneau latéral)</option>
           </select>
         </div>
         <div class="field">
@@ -506,6 +265,12 @@
 
     const poolColsRaw = document.getElementById('mf-poolcols').value;
     const payload = { id, label, kind, role, unlockAfter, poolCols: poolColsRaw ? Number(poolColsRaw) : null };
+
+    if (editingModuleId == null) {
+      const zoneEl = document.getElementById('mf-zone');
+      const z = zoneEl ? zoneEl.value : '';
+      if (z) payload.zone = z;
+    }
 
     if (isNew) {
       c.modules.push(payload);
@@ -1361,11 +1126,6 @@ function openStudentTextPreview(rteEl) {
      ========================================================= */
   function bind() {
     $('#cfg-save').addEventListener('click', saveConfig);
-    $('#mod-add').addEventListener('click', startAddModule);
-    $('#mod-toolbar').addEventListener('click', onModToolbarClick);
-    $('#mod-list').addEventListener('click', onModListClick);
-    $('#mod-list').addEventListener('dblclick', onModListDblClick);
-    root.addEventListener('pointerdown', onModPointerDown);
     $('#row-add').addEventListener('click', startAddRow);
     $('#rows-toggle-flatten').addEventListener('click', onToggleFlattenAll);
     $('#row-list').addEventListener('click', onRowListClick);
@@ -1382,7 +1142,6 @@ function openStudentTextPreview(rteEl) {
 
   function renderAll() {
     try { syncConfigForm(); } catch (e) { console.error('[teacher.syncConfigForm]', e); }
-    try { renderModules(); } catch (e) { console.error('[teacher.renderModules]', e); }
     try { renderRows(); } catch (e) { console.error('[teacher.renderRows]', e); }
   }
 })();

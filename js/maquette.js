@@ -8,12 +8,21 @@
   const T = App.theme;
   const esc = App.utils.escapeHtml;
 
-  // Zones acceptées par type d'élément glissé
+  // Zones acceptées par type d'élément glissé (pools-order = réordonner dans les Réserves)
   const ACCEPTS = {
-    module: ['columns', 'left', 'right', 'hidden'],
+    module: ['columns', 'left', 'right', 'hidden', 'pools-order'],
     pools: ['pools-top', 'pools-bottom'],
     row: ['rows']
   };
+  // Zones recevant un bouton « + » d'ajout de module
+  const ADD_ZONE = { columns: 'columns', 'pools-top': 'pools', 'pools-bottom': 'pools', left: 'left', right: 'right', hidden: 'hidden' };
+
+  const chipActions = (id) =>
+    '<span class="mq-acts">' +
+      '<button type="button" class="mq-act" data-mq-act="edit" data-act-id="' + esc(id) + '" title="Éditer ce module">✎</button>' +
+      '<button type="button" class="mq-act" data-mq-act="view" data-act-id="' + esc(id) + '" title="Visualiser les contenus">📄</button>' +
+      '<button type="button" class="mq-act danger" data-mq-act="del" data-act-id="' + esc(id) + '" title="Supprimer ce module">🗑</button>' +
+    '</span>';
   const DRAG_THRESHOLD = 6;
 
   let root = null;
@@ -134,7 +143,9 @@
         </div>
       </div>
       <p class="hint">
-        Glissez les éléments dans l'aperçu pour organiser l'écran. Chaque réglage est
+        Tout se pilote ici : glissez les modules pour les déplacer ou les réordonner,
+        ajoutez-en avec le bouton <strong>＋</strong> de chaque zone, éditez/visualisez/supprimez
+        avec <strong>✎ 📄 🗑</strong> au survol des blocs. Chaque réglage est
         <strong>enregistré automatiquement</strong> (indicateur en haut à droite) et aussitôt
         visible dans les espaces élève et prof.
       </p>
@@ -210,6 +221,26 @@
   }
 
   function onClick(e) {
+    /* Gestion des modules pilotée depuis les blocs et étiquettes de la maquette */
+    const act = e.target.closest('[data-mq-act]');
+    if (act) {
+      e.preventDefault();
+      e.stopPropagation();
+      const id = act.dataset.actId;
+      const A = App.teacher;
+      if (!id || !A) return;
+      if (act.dataset.mqAct === 'edit') A.editModule(id);
+      else if (act.dataset.mqAct === 'view') A.moduleContents(id);
+      else if (act.dataset.mqAct === 'del') A.removeModule(id);
+      return;
+    }
+    const addBtn = e.target.closest('[data-mq-add]');
+    if (addBtn) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (App.teacher) App.teacher.addModule(addBtn.dataset.mqAdd);
+      return;
+    }
     const reset = e.target.closest('[data-mq-reset]');
     if (reset) {
       draft.theme[reset.dataset.mqReset] = '';
@@ -261,16 +292,21 @@
     const style = showWidth
       ? ' style="flex-grow:' + span + ';flex-basis:0;min-width:0"' : '';
     const badge = showWidth ? '' : '<span class="badge">' + esc(kindLabel(m)) + '</span>';
+    const lock = (m.unlockAfter && m.unlockAfter.length)
+      ? ' <span class="badge" title="Verrou pédagogique actif">🔒</span>' : '';
     return '<div class="mq-chip mq-chip-module' + (m.role === 'associate' ? ' is-assoc' : '') +
       '" data-drag-kind="module" data-drag-id="' + esc(m.id) + '" title="' + esc(m.id) + '"' + style + '>' +
       '<span class="mq-grip" aria-hidden="true">⣿</span>' +
       '<span class="mq-name">' + esc(modLabel(m)) + '</span>' +
-      badge + '</div>';
+      badge + lock +
+      chipActions(m.id) + '</div>';
   }
 
   function zoneHtml(name, title, inner, cls, itemsAttr) {
+    const plus = ADD_ZONE[name]
+      ? '<button type="button" class="mq-add" data-mq-add="' + ADD_ZONE[name] + '" title="Ajouter un module">＋</button>' : '';
     return '<div class="mq-zone ' + (cls || '') + '" data-zone="' + name + '">' +
-      '<div class="mq-zone-label">' + title + '</div>' +
+      '<div class="mq-zone-label">' + title + plus + '</div>' +
       '<div class="mq-zone-items"' + (itemsAttr || '') + '>' + (inner || '<span class="mq-empty">Déposez ici</span>') + '</div>' +
       '</div>';
   }
@@ -315,8 +351,8 @@
     const poolsChip = '<div class="mq-chip mq-chip-pools" data-drag-kind="pools" data-drag-id="pools">' +
       '<span class="mq-grip" aria-hidden="true">⠿</span>' +
       '<div class="mq-pools-body"><div class="mq-pools-title">Réserves</div>' +
-      '<div class="mq-mini-pools" style="grid-template-columns:' + poolsTpl + '">' +
-      assoc.map((m) => '<span class="mq-mini" data-span-id="' + esc(m.id) + '" title="' + esc(m.id) + '">' + esc(modLabel(m)) + '</span>').join(poolsOneLine ? RESIZER : '') +
+      '<div class="mq-mini-pools" data-zone="pools-order" style="grid-template-columns:' + poolsTpl + '">' +
+      assoc.map((m) => '<span class="mq-mini" data-drag-kind="module" data-drag-id="' + esc(m.id) + '" data-span-id="' + esc(m.id) + '" title="' + esc(m.id) + '">' + esc(modLabel(m)) + chipActions(m.id) + '</span>').join(poolsOneLine ? RESIZER : '') +
       '</div></div></div>';
 
     // Plateau : grille de N colonnes égales, ou une ligne avec séparateurs de largeur
@@ -355,7 +391,7 @@
       startResize(e);
       return;
     }
-    const chip = e.target.closest('.mq-chip');
+    const chip = e.target.closest('.mq-chip, .mq-mini');
     if (!chip || !root.contains(chip) || drag) return;
     if (e.pointerType === 'mouse' && e.button !== 0) return;
     drag = {
@@ -383,8 +419,8 @@
 
   function zoneAt(x, y) {
     const el = document.elementFromPoint(x, y);
-    const z = el && el.closest('.mq-zone');
-    return z && root.contains(z) && ACCEPTS[drag.kind].includes(z.dataset.zone) ? z : null;
+    const z = el && el.closest('.mq-zone, [data-zone]');
+    return z && root.contains(z) && ACCEPTS[drag.kind] && ACCEPTS[drag.kind].includes(z.dataset.zone) ? z : null;
   }
 
   function onMove(e) {
@@ -408,7 +444,8 @@
     const zone = hoverZone;
     endDrag();
     if (!d || !d.dragging || !zone) return;
-    drop(d, zone.dataset.zone, insertIndex(zone, d, e.clientX, e.clientY));
+    const sel = zone.dataset.zone === 'pools-order' ? '.mq-mini' : '.mq-chip';
+    drop(d, zone.dataset.zone, insertIndex(zone, d, e.clientX, e.clientY, sel));
   }
 
   let rz = null;
@@ -488,9 +525,10 @@
     drag = null;
   }
 
-  /** Position d'insertion parmi les éléments de la zone (hors élément glissé). */
-  function insertIndex(zoneEl, d, x, y) {
-    const chips = [...zoneEl.querySelectorAll('.mq-chip')].filter((c) => c !== d.chip);
+  /** Position d'insertion parmi les éléments de la zone (hors élément glissé).
+      sel : sélecteur des éléments frères ('.mq-chip' ou '.mq-mini'). */
+  function insertIndex(zoneEl, d, x, y, sel) {
+    const chips = [...zoneEl.querySelectorAll(sel || '.mq-chip')].filter((c) => c !== d.chip);
     for (let i = 0; i < chips.length; i++) {
       const r = chips[i].getBoundingClientRect();
       if (y < r.top || (y <= r.bottom && x < r.left + r.width / 2)) return i;
@@ -501,9 +539,27 @@
   function drop(d, zone, index) {
     if (d.kind === 'pools') draft.poolsSide = zone === 'pools-bottom' ? 'bottom' : 'top';
     else if (d.kind === 'row') moveRow(d.id, index);
+    else if (zone === 'pools-order') moveInPools(d.id, index);
     else if (d.kind === 'module') moveModule(d.id, zone, index);
     renderPreview();
     scheduleApply();
+  }
+
+  /* Réordonne les modules à associer depuis la mini-grille des Réserves.
+     Un module informatif déposé dans les Réserves devient « à associer ». */
+  function moveInPools(id, index) {
+    const m = draft.modules.find((x) => x.id === id);
+    if (!m) return;
+    if (m.role !== 'associate') {
+      m.role = 'associate';
+      delete m.zone;
+    }
+    const members = draft.modules.filter((x) => x.role === 'associate');
+    members.splice(members.indexOf(m), 1);
+    const at = members[Math.max(0, Math.min(index, members.length))];
+    draft.modules = draft.modules.filter((x) => x !== m);
+    if (!at) draft.modules.push(m);
+    else draft.modules.splice(draft.modules.indexOf(at), 0, m);
   }
 
   function moveRow(id, index) {
