@@ -1135,3 +1135,20 @@ body.student-mode .pool > .item{
 .mq-mini:hover{ overflow:visible; flex-wrap:wrap; white-space:normal; }
 .mq-mini .mq-acts{ opacity:0; }
 .mq-mini.dragging{ opacity:.3; }
+
+/* =========================================================
+   GRILLE « N PAR LIGNE » : rangées avec largeurs conservées
+   Chaque ligne garde les largeurs réglées (span / poolSpan)
+   au lieu de colonnes uniformes.
+   ========================================================= */
+.mq-mrow{ display:flex; gap:.25rem; align-items:stretch; width:100%; }
+.pools.pools-rows{ display:flex; flex-direction:column; }
+.pools-line{ display:grid; gap:inherit; min-height:0; flex:1 1 0; }
+body.student-mode .row.row-multiline{ grid-template-columns:2rem minmax(0,1fr); }
+.row-lines{ display:flex; flex-direction:column; gap:.5rem; min-width:0; }
+.row-line{ display:grid; gap:.75rem; align-items:stretch; min-width:0; }
+@media(max-width:780px){
+  body.student-mode .row.row-multiline{ grid-template-columns:minmax(0,1fr); }
+  .row-line{ gap:.3rem; }
+  .row-lines{ gap:.3rem; }
+}

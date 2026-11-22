@@ -44,6 +44,17 @@
     return { cols, tpl: 'repeat(' + cols + ',minmax(0,1fr))', lines: Math.max(1, Math.ceil(mods.length / cols)) };
   }
 
+  // Découpe une liste en lignes de n éléments (mode grille « N par ligne »).
+  // Chaque ligne garde les largeurs réglées (span / poolSpan) au lieu de
+  // colonnes uniformes.
+  const chunk = (arr, n) => {
+    const out = [];
+    for (let i = 0; i < arr.length; i += n) out.push(arr.slice(i, i + n));
+    return out;
+  };
+  const groupTpl = (group, wKey) => group.map((m) =>
+    'minmax(0,' + (Math.max(0.5, Number(m[wKey]) || 1)) + 'fr)').join(' ');
+
   /* =========================================================
      MONTAGE
      ========================================================= */
@@ -109,10 +120,7 @@
     const zone = $('#s-pools-zone');
     zone.classList.remove('has-expanded-module');
     const poolPlan = gridPlan(mods, c.layout && c.layout.poolsCols, 'poolSpan');
-    zone.innerHTML =
-     '<div class="pools' + (poolPlan.lines > 1 ? ' pools-multiline' : '') +
-      '" style="--cols:' + poolPlan.cols + ';--cols-tpl:' + poolPlan.tpl + '">' +
-      mods.map((m) => `
+    const colHtml = (m) => `
         <div class="pool-col">
           <h3 class="pool-title">
             <span>${esc(modLabel(m))}</span>
@@ -127,8 +135,16 @@
             </button>
           </h3>
           <div class="pool${m.poolCols ? ' is-gridded' : ''}" data-pool-module="${esc(m.id)}" id="pool-${esc(m.id)}"${m.poolCols ? ' style="--pool-cols:' + Number(m.poolCols) + '"' : ''}></div>
-        </div>`).join('') +
-      '</div>';
+        </div>`;
+    const poolsInner = poolPlan.lines > 1
+      ? chunk(mods, poolPlan.cols).map((g) =>
+          '<div class="pools-line" style="grid-template-columns:' + groupTpl(g, 'poolSpan') + '">' +
+          g.map((m) => colHtml(m)).join('') + '</div>').join('')
+      : mods.map((m) => colHtml(m)).join('');
+    zone.innerHTML =
+     '<div class="pools' + (poolPlan.lines > 1 ? ' pools-rows' : '') +
+      '" style="--cols:' + poolPlan.cols + (poolPlan.lines > 1 ? '' : ';--cols-tpl:' + poolPlan.tpl) + '">' +
+      poolsInner + '</div>';
     expandedModuleId = null;
 
     viewed = {};
@@ -234,16 +250,24 @@
 
     const boardPlan = gridPlan(mods, cfg().layout && cfg().layout.boardCols, 'span');
     const multi = boardPlan.lines > 1;
+    const slotHtml = (m, r) => {
+      const k = occupantOf(m.id, r);
+      return '<div class="slot" data-slot-module="' + esc(m.id) + '" data-row="' + r + '">' +
+        (k ? itemHtml(k) : slotHint(m)) + '</div>';
+    };
     let html = '';
     for (let r = 0; r < rows.length; r++) {
       html += '<div class="row' + (multi ? ' row-multiline' : '') + '" data-row="' + r + '">' +
-        '<div class="row-index"' + (multi ? ' style="grid-row:span ' + boardPlan.lines + '"' : '') + '>' +
-        (r + 1) + '</div>';
-      mods.forEach((m) => {
-        const k = occupantOf(m.id, r);
-        html += '<div class="slot" data-slot-module="' + esc(m.id) + '" data-row="' + r + '">' +
-          (k ? itemHtml(k) : slotHint(m)) + '</div>';
-      });
+        '<div class="row-index">' + (r + 1) + '</div>';
+      if (multi) {
+        html += '<div class="row-lines">' +
+          chunk(mods, boardPlan.cols).map((g) =>
+            '<div class="row-line" style="grid-template-columns:' + groupTpl(g, 'span') + '">' +
+            g.map((m) => slotHtml(m, r)).join('') + '</div>').join('') +
+          '</div>';
+      } else {
+        mods.forEach((m) => { html += slotHtml(m, r); });
+      }
       html += '</div>';
     }
     const boardEl = $('#board');

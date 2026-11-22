@@ -41,6 +41,12 @@
   // Largeurs manuelles indépendantes : plateau (span) et réserves (poolSpan)
   const spanOf = (m) => Math.max(0.5, Number(m.span) || 1);
   const poolSpanOf = (m) => Math.max(0.5, Number(m.poolSpan) || 1);
+  // Découpe une liste en rangées de n éléments (mode grille « N par ligne »)
+  const chunkOf = (arr, n) => {
+    const out = [];
+    for (let i = 0; i < arr.length; i += n) out.push(arr.slice(i, i + n));
+    return out;
+  };
 
   /* =========================================================
      BROUILLON
@@ -342,27 +348,37 @@
     const pcDraft = gridCols(draft.poolsCols, assoc.length);
     const pc = (pcDraft && pcDraft >= assoc.length) ? 0 : pcDraft;
     const poolsOneLine = !pc;
-    const poolParts = [];
-    assoc.forEach((m, i) => {
-      if (i && poolsOneLine) poolParts.push('9px');
-      poolParts.push('minmax(0,' + poolSpanOf(m) + 'fr)');
-    });
-    const poolsTpl = pc ? 'repeat(' + pc + ',minmax(0,1fr))' : poolParts.join(' ');
+    const miniChip = (m, flex) => '<span class="mq-mini" data-drag-kind="module" data-drag-id="' + esc(m.id) +
+      '" data-span-id="' + esc(m.id) + '"' +
+      (flex ? ' style="flex-grow:' + poolSpanOf(m) + ';flex-basis:0;min-width:0"' : '') +
+      ' title="' + esc(m.id) + '">' + esc(modLabel(m)) + chipActions(m.id) + '</span>';
+    let poolsInner;
+    let poolsMiniAttr = '';
+    if (poolsOneLine) {
+      const poolParts = [];
+      assoc.forEach((m, i) => { if (i) poolParts.push('9px'); poolParts.push('minmax(0,' + poolSpanOf(m) + 'fr)'); });
+      poolsInner = assoc.map((m) => miniChip(m, false)).join(RESIZER);
+      poolsMiniAttr = ' style="grid-template-columns:' + poolParts.join(' ') + '"';
+    } else {
+      poolsInner = chunkOf(assoc, pc).map((g) =>
+        '<div class="mq-mrow">' + g.map((m) => miniChip(m, true)).join(RESIZER) + '</div>').join('');
+    }
     const poolsChip = '<div class="mq-chip mq-chip-pools" data-drag-kind="pools" data-drag-id="pools">' +
       '<span class="mq-grip" aria-hidden="true">⠿</span>' +
       '<div class="mq-pools-body"><div class="mq-pools-title">Réserves</div>' +
-      '<div class="mq-mini-pools" data-zone="pools-order" style="grid-template-columns:' + poolsTpl + '">' +
-      assoc.map((m) => '<span class="mq-mini" data-drag-kind="module" data-drag-id="' + esc(m.id) + '" data-span-id="' + esc(m.id) + '" title="' + esc(m.id) + '">' + esc(modLabel(m)) + chipActions(m.id) + '</span>').join(poolsOneLine ? RESIZER : '') +
-      '</div></div></div>';
+      '<div class="mq-mini-pools" data-zone="pools-order"' + poolsMiniAttr + '>' + poolsInner + '</div></div></div>';
 
-    // Plateau : grille de N colonnes égales, ou une ligne avec séparateurs de largeur
-    // Si la grille tient de toute façon sur une ligne (N >= nb de modules à associer),
-    // on garde les largeurs manuelles et les séparateurs : les deux réglages donnent
-    // le même rendu, mais un seul laisse le redimensionnement possible.
+    // Plateau : rangées de N modules (poignées entre voisins de la même
+    // rangée), ou une seule ligne si N vaut 0 ou que la grille tient de toute
+    // façon sur une ligne — dans ce cas, largeurs manuelles et séparateurs.
     const bcDraft = gridCols(draft.boardCols, assoc.length);
     const bc = (bcDraft && bcDraft >= assoc.length) ? 0 : bcDraft;
-    const boardChips = assoc.map((m) => moduleChip(m, true)).join(bc ? '' : RESIZER);
-    const boardAttr = bc ? ' style="display:grid;grid-template-columns:repeat(' + bc + ',minmax(0,1fr))"' : '';
+    // Grille N par ligne : rangées de N modules, poignées entre voisins de
+    // la même rangée (les largeurs span restent respectées dans chaque rangée).
+    const boardInner = bc
+      ? chunkOf(assoc, bc).map((g) =>
+          '<div class="mq-mrow">' + g.map((m) => moduleChip(m, true)).join(RESIZER) + '</div>').join('')
+      : assoc.map((m) => moduleChip(m, true)).join(RESIZER);
     const poolsZone = (name, side) => zoneHtml(name, 'Réserves', draft.poolsSide === side ? poolsChip : '', 'mq-pools');
 
     $('#mq-preview').innerHTML =
@@ -373,7 +389,7 @@
         '<div class="mq-main">' +
           zoneHtml('left', 'Panneau gauche', inZone('left').map(moduleChip).join(''), 'mq-side') +
           zoneHtml('columns', 'Plateau — colonnes à associer (dans l\'ordre)',
-            boardChips, 'mq-board', boardAttr) +
+            boardInner, 'mq-board') +
           zoneHtml('right', 'Panneau droit', inZone('right').map(moduleChip).join(''), 'mq-side') +
         '</div>' +
         poolsZone('pools-bottom', 'bottom') +
@@ -460,8 +476,7 @@
       x.id === (el.dataset.dragId || el.dataset.spanId));
     const mods = [left, right].map(modulesOf);
     if (mods.some((m) => !m)) return;
-    const isPools = sep.parentNode.classList &&
-      sep.parentNode.classList.contains('mq-mini-pools');
+    const isPools = !!sep.closest('.mq-mini-pools');
     const wKey = isPools ? 'poolSpan' : 'span';
     const widths = mods.map((m) => Math.max(0.5, Number(m[wKey]) || 1));
     const lr = left.getBoundingClientRect();
@@ -470,7 +485,8 @@
       chips: [left, right], mods, wKey,
       spans: widths,
       pxPerSpan: (lr.width + rr.width) / (widths[0] + widths[1]),
-      grid: isPools ? sep.parentNode : null,
+      grid: (isPools && sep.parentNode.classList &&
+        sep.parentNode.classList.contains('mq-mini-pools')) ? sep.parentNode : null,
       startX: e.clientX
     };
     window.addEventListener('pointermove', onResizeMove);
@@ -489,10 +505,8 @@
     let b = clampSpan(pair - a);
     rz.mods[0][rz.wKey] = a;
     rz.mods[1][rz.wKey] = b;
-    if (rz.wKey === 'span') {
-      if (rz.chips[0]) rz.chips[0].style.flexGrow = a;
-      if (rz.chips[1]) rz.chips[1].style.flexGrow = b;
-    }
+    if (rz.chips[0]) rz.chips[0].style.flexGrow = a;
+    if (rz.chips[1]) rz.chips[1].style.flexGrow = b;
     if (rz.grid) syncMiniTemplate(rz.grid);
   }
 
