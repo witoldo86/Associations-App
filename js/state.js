@@ -41,6 +41,7 @@
         if (!r.cells || typeof r.cells !== 'object') r.cells = {};
         cfg.modules.forEach((m) => {
           if (!(m.id in r.cells)) r.cells[m.id] = App.schema.Types[m.kind].createEmpty();
+          else r.cells[m.id] = App.schema.coerceValue(m.kind, r.cells[m.id]);
         });
         // Données importées (JSON, data.js) : on ne fait jamais confiance au HTML reçu
         rich.forEach((m) => {

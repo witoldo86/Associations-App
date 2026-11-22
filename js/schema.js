@@ -132,10 +132,52 @@
     }
   };
 
+  /* =========================================================
+     ADAPTATION DES VALEURS (imports JSON, data.js, résultats élèves)
+     Convertit les formes des anciens exports vers le format v2 : par ex.
+     un cartel en simple chaîne ou une image réduite à sa source.
+     Le meilleur effort est préservé : rien n'est effacé.
+     ========================================================= */
+  function coerceMedia(v) {
+    if (v == null) return { src: '', caption: '' };
+    if (typeof v === 'string') return { src: v, caption: '' };
+    if (typeof v === 'object') {
+      return {
+        src: String(v.src != null ? v.src : (v.url || '')),
+        caption: String((v.caption != null && v.caption !== '') ? v.caption : (v.title || ''))
+      };
+    }
+    return { src: String(v), caption: '' };
+  }
+
+  const COERCERS = {
+    text(v) {
+      if (v == null) return '';
+      if (typeof v === 'object') {
+        return App.utils.stripHtml(v.html || '') || String(v.title || '').trim();
+      }
+      return String(v);
+    },
+    image: coerceMedia,
+    audio: coerceMedia,
+    video: coerceMedia,
+    url: coerceMedia,
+    richtext(v) {
+      if (v == null) return { title: '', html: '' };
+      // Chaîne ancienne : HTML brut conservé tel quel (sanitizeRich l'assainit ensuite)
+      if (typeof v === 'string') return { title: '', html: v };
+      if (typeof v === 'object') {
+        return { title: String(v.title || ''), html: String(v.html != null ? v.html : (v.text || '')) };
+      }
+      return { title: '', html: '<p>' + esc(String(v)) + '</p>' };
+    }
+  };
+
   App.schema = {
     Types,
     kindExists: (k) => !!Types[k],
     kindInfo:   (k) => Types[k] || null,
+    coerceValue: (kind, v) => (COERCERS[kind] ? COERCERS[kind](v) : v),
 
     defaultConfig() {
       return {
