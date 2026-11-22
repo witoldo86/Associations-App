@@ -70,9 +70,10 @@
           <select id="mq-boardcols" data-mq="boardCols">${gridOptions()}</select></div>
         <div class="field"><label for="mq-poolscols">Réserves : modules par ligne</label>
           <select id="mq-poolscols" data-mq="poolsCols">${gridOptions()}</select></div>
-        <p class="hint">Avec « Tous sur une ligne », les largeurs se règlent à la main dans l'aperçu.
-          Une grille ne passe sur plusieurs lignes qu'à partir du moment où sa valeur dépasse le
-          nombre de modules : tant qu'elle tient sur une ligne, les largeurs restent réglables.</p>
+        <p class="hint">Le <strong>plateau</strong> est la zone où l'élève dépose ses réponses (colonnes
+          à associer) ; les <strong>réserves</strong> sont les bacs d'où il pioche les éléments.
+          Dans les deux, tant que les modules tiennent sur une ligne, les largeurs se règlent
+          à la main dans l'aperçu (séparateurs bleus) ; au-delà, la grille impose des colonnes égales.</p>
       </fieldset>
 
       <fieldset class="mq-group">
@@ -278,16 +279,23 @@
     const assoc = draft.modules.filter((m) => m.role === 'associate');
     const inZone = (z) => draft.modules.filter((m) => m.role === 'informative' && m.zone === z);
 
-    // Réserves : mini-grille montrant la disposition choisie
-    const pc = gridCols(draft.poolsCols, assoc.length);
-    const poolsTpl = pc
-      ? 'repeat(' + pc + ',minmax(0,1fr))'
-      : assoc.map((m) => 'minmax(0,' + spanOf(m) + 'fr)').join(' ');
+    // Réserves : mini-grille montrant la disposition choisie.
+    // Comme pour le plateau : si la grille tient de toute façon sur une ligne,
+    // on garde les largeurs manuelles et des séparateurs de redimensionnement.
+    const pcDraft = gridCols(draft.poolsCols, assoc.length);
+    const pc = (pcDraft && pcDraft >= assoc.length) ? 0 : pcDraft;
+    const poolsOneLine = !pc;
+    const poolParts = [];
+    assoc.forEach((m, i) => {
+      if (i && poolsOneLine) poolParts.push('9px');
+      poolParts.push('minmax(0,' + spanOf(m) + 'fr)');
+    });
+    const poolsTpl = pc ? 'repeat(' + pc + ',minmax(0,1fr))' : poolParts.join(' ');
     const poolsChip = '<div class="mq-chip mq-chip-pools" data-drag-kind="pools" data-drag-id="pools">' +
       '<span class="mq-grip" aria-hidden="true">⠿</span>' +
       '<div class="mq-pools-body"><div class="mq-pools-title">Réserves</div>' +
       '<div class="mq-mini-pools" style="grid-template-columns:' + poolsTpl + '">' +
-      assoc.map((m) => '<span class="mq-mini">' + esc(modLabel(m)) + '</span>').join('') +
+      assoc.map((m) => '<span class="mq-mini" data-span-id="' + esc(m.id) + '" title="' + esc(m.id) + '">' + esc(modLabel(m)) + '</span>').join(poolsOneLine ? RESIZER : '') +
       '</div></div></div>';
 
     // Plateau : grille de N colonnes égales, ou une ligne avec séparateurs de largeur
@@ -390,8 +398,9 @@
     const left = sep.previousElementSibling;
     const right = sep.nextElementSibling;
     if (!left || !right || left.classList.contains('mq-resizer')) return;
-    const mods = [left, right].map((chipEl) =>
-      draft.modules.find((x) => x.id === chipEl.dataset.dragId));
+    const modulesOf = (el) => draft.modules.find((x) =>
+      x.id === (el.dataset.dragId || el.dataset.spanId));
+    const mods = [left, right].map(modulesOf);
     if (mods.some((m) => !m)) return;
     const lr = left.getBoundingClientRect();
     const rr = right.getBoundingClientRect();
@@ -400,6 +409,8 @@
       spans: mods.map((m) => Number(m.span) || 1),
       pxPerSpan: (lr.width + rr.width) /
                  ((Number(mods[0].span) || 1) + (Number(mods[1].span) || 1)),
+      grid: (sep.parentNode.classList && sep.parentNode.classList.contains('mq-mini-pools'))
+        ? sep.parentNode : null,
       startX: e.clientX
     };
     window.addEventListener('pointermove', onResizeMove);
@@ -420,6 +431,16 @@
     rz.mods[1].span = b;
     if (rz.chips[0]) rz.chips[0].style.flexGrow = a;
     if (rz.chips[1]) rz.chips[1].style.flexGrow = b;
+    if (rz.grid) syncMiniTemplate(rz.grid);
+  }
+
+  /* Reconstruit le gabarit de la mini-grille des réserves après un changement de largeur. */
+  function syncMiniTemplate(container) {
+    container.style.gridTemplateColumns = [...container.children].map((el) => {
+      if (el.classList.contains('mq-resizer')) return '9px';
+      const m = draft.modules.find((x) => x.id === el.dataset.spanId);
+      return 'minmax(0,' + spanOf(m || {}) + 'fr)';
+    }).join(' ');
   }
 
   function onResizeEnd() {

@@ -107,7 +107,7 @@
 
     const zone = $('#s-pools-zone');
     zone.classList.remove('has-expanded-module');
-    const poolPlan = gridPlan(mods, c.layout && c.layout.poolsCols);
+    const poolPlan = gridPlan(mods, c.layout && c.layout.poolsCols, true);
     zone.innerHTML =
      '<div class="pools' + (poolPlan.lines > 1 ? ' pools-multiline' : '') +
       '" style="--cols:' + poolPlan.cols + ';--cols-tpl:' + poolPlan.tpl + '">' +
