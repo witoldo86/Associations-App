@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Atelier d'association — Dates / Images / Cartels</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="app-header">
+  <div class="header-data-tools" role="toolbar" aria-label="Données et sauvegarde (espace prof)">
+    <button type="button" class="btn small primary" id="data-portable">📦 Exporter pour la classe (data.js)</button>
+    <button type="button" class="btn small" id="data-export">Sauvegarder (JSON)</button>
+    <button type="button" class="btn small" id="data-import-btn">Importer (JSON)</button>
+    <input type="file" id="data-import" accept="application/json,.json" hidden>
+    <button type="button" class="btn small" id="data-results-btn">📁 Résultats élèves</button>
+    <input type="file" id="data-results-input" accept="application/json,.json" multiple hidden>
+    <button type="button" class="btn small danger" id="data-clear-all">Tout effacer</button>
+  </div>
+  <h1>Atelier d'association</h1>
+  <nav class="mode-switch">
+    <button type="button" id="btn-lock" title="Verrouiller / déverrouiller l'accès prof">🔒</button>
+    <button type="button" data-mode="student" class="active">Espace élève</button>
+    <button type="button" data-mode="teacher">Espace prof</button>
+  </nav>
+</header>
+
+<main>
+  <section id="view-teacher" class="view" hidden></section>
+  <section id="view-student" class="view"></section>
+</main>
+
+<div id="modal-root"></div>
+
+<script src="data.js"></script>
+<script src="js/utils.js"></script>
+<script src="js/theme.js"></script>
+<script src="js/schema.js"></script>
+<script src="js/storage.js"></script>
+<script src="js/state.js"></script>
+<script src="js/modal.js"></script>
+<script src="js/maquette.js"></script>
+<script src="js/teacher.js"></script>
+<script src="js/student.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
