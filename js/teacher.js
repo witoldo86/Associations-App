@@ -15,6 +15,12 @@
   const $ = (sel) => root.querySelector(sel);
   const $$ = (sel) => [...root.querySelectorAll(sel)];
 
+  /* Source affichable : « media:<clé> » -> URL de blob (js/media.js). */
+  function resolveSrc(src) {
+    if (App.media && typeof App.media.resolve === 'function') return App.media.resolve(src);
+    return src;
+  }
+
   function cfg() { return App.state.config(); }
   function assocMods() { return cfg().modules.filter((m) => m.role === 'associate'); }
   function allMods()   { return cfg().modules; }
@@ -545,8 +551,11 @@
         (has ? '' : ' <span class="muted">(vide)</span>') + '</div>';
 
       if (m.kind === 'image' && v && v.src) {
+        const src = resolveSrc(v.src);
         return num + '<div class="mini-line">' +
-          '<img class="mini" src="' + esc(v.src) + '" alt="">' +
+          (src
+            ? '<img class="mini" src="' + esc(src) + '" alt="">'
+            : '<span class="mini-info muted">(média introuvable)</span>') +
           '<span class="mini-info">' + esc(v.caption || '(sans légende)') + '</span></div>';
       }
       if (m.kind === 'richtext' && v) {
@@ -676,7 +685,7 @@ $('#row-list').innerHTML = rows.map((r, i) => {
       const caption = v && v.caption ? String(v.caption).trim() : '';
       boxExtraClass = caption ? ' has-caption' : ' image-only';
       content =
-        `<img class="cell-thumb" src="${esc(v.src)}" alt="" loading="lazy" decoding="async">` +
+        `<img class="cell-thumb" src="${esc(resolveSrc(v.src))}" alt="" loading="lazy" decoding="async">` +
         (caption ? `<span class="cell-snippet">${esc(caption)}</span>` : '');
     } else if (m.kind === 'text') {
       const raw = String(v).trim();
@@ -848,6 +857,7 @@ $('#row-list').innerHTML = rows.map((r, i) => {
     if (field.type === 'url-or-file') {
       const showPreview = (field.accept||'').indexOf('image') !== -1;
       const isUrl = /^https?:\/\//i.test(value);
+      const shown = resolveSrc(value);
       return `
         <div class="field">
           <label>${label}</label>
@@ -858,7 +868,7 @@ $('#row-list').innerHTML = rows.map((r, i) => {
           </div>
           ${showPreview ? `
             <div class="image-preview" id="${id}_preview" ${value?'':'hidden'}>
-              <img alt="" src="${esc(value)}">
+              <img alt="" src="${esc(shown)}">
               <button type="button" class="btn link" data-clear="${id}">Retirer</button>
             </div>` : ''}
           <input id="${id}" data-field="${esc(field.name)}" type="hidden" value="${esc(value)}">
@@ -1105,20 +1115,29 @@ function openStudentTextPreview(rteEl) {
   function onFileField(input, baseId) {
     const file = input.files[0];
     if (!file) return;
-    if (file.size > 800 * 1024) {
-      const ko = Math.round(file.size / 1024);
-      if (!confirm('Fichier volumineux (' + ko + ' Ko).\nLe stockage local risque de saturer.\nPréférez une URL. Continuer ?')) {
-        input.value = ''; return;
-      }
-    }
-    const reader = new FileReader();
-    reader.onload = () => {
-      const value = String(reader.result);
+    const apply = (value) => {
       document.getElementById(baseId).value = value;
       document.getElementById(baseId + '_url').value = '';
       const preview = document.getElementById(baseId + '_preview');
-      if (preview) { preview.querySelector('img').src = value; preview.hidden = false; }
+      if (preview) { preview.querySelector('img').src = resolveSrc(value); preview.hidden = false; }
     };
+    if (App.media && typeof App.media.putFile === 'function') {
+      App.media.putFile(file).then(apply).catch(() => fallbackFileField(file, apply, input));
+      return;
+    }
+    fallbackFileField(file, apply, input);
+  }
+
+  function fallbackFileField(file, apply, input) {
+    if (file.size > 800 * 1024) {
+      const ko = Math.round(file.size / 1024);
+      if (!confirm('Fichier volumineux (' + ko + ' Ko).\nLe stockage local risque de saturer.\nPréférez une URL. Continuer ?')) {
+        if (input) input.value = '';
+        return;
+      }
+    }
+    const reader = new FileReader();
+    reader.onload = () => apply(String(reader.result));
     reader.readAsDataURL(file);
   }
 
@@ -1232,16 +1251,25 @@ function openStudentTextPreview(rteEl) {
     </section>`;
   }
 
-  function onExportPortable() {
+  /* Jeu de données autonome pour l'export : les références « media: »
+     sont réintégrées en « data: » (fichiers réincrustés). */
+  function exportData() {
+    if (App.media && typeof App.media.inline === 'function') return App.media.inline(App.state.data);
+    return Promise.resolve(App.state.data);
+  }
+
+  async function onExportPortable() {
+    const data = await exportData();
     const content =
       '/* Données de l\'exercice — générées le ' + new Date().toLocaleString('fr-FR') + ' */\n' +
-      'window.ASSOC3_SEED = ' + JSON.stringify(App.state.data, null, 2) + ';\n';
+      'window.ASSOC3_SEED = ' + JSON.stringify(data, null, 2) + ';\n';
     App.utils.download('data.js', content, 'application/javascript');
     alert('Fichier "data.js" généré. Placez-le à côté de index.html.');
   }
 
-  function onExport() {
-    App.utils.download('associations.json', JSON.stringify(App.state.data, null, 2), 'application/json');
+  async function onExport() {
+    const data = await exportData();
+    App.utils.download('associations.json', JSON.stringify(data, null, 2), 'application/json');
   }
 
   async function onImport(e) {
@@ -1266,6 +1294,9 @@ function openStudentTextPreview(rteEl) {
   function onClearAll() {
     if (!confirm('Supprimer TOUTES les données ? Action irréversible.')) return;
     const cfg = App.state.config();
+    if (App.media && typeof App.media.clear === 'function') {
+      App.media.clear();
+    }
     App.state.replaceAll({ version: 2, config: cfg, rows: [] });
   }
 

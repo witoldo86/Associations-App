@@ -3,6 +3,13 @@
   const App = (window.App = window.App || {});
   const esc = App.utils.escapeHtml;
 
+  /* Source affichable : la référence « media:<clé> » est convertie en
+     URL de blob par le magasin de médias (js/media.js). */
+  function msrc(src) {
+    if (App.media && typeof App.media.resolve === 'function') return App.media.resolve(src);
+    return src;
+  }
+
   const Types = {
     text: {
       label: 'Texte',
@@ -29,14 +36,16 @@
         { name:'caption', type:'text',        label:'Légende (facultatif)', value:(v&&v.caption)||'' }
       ],
       build: (f) => ({ src: f.src, caption: f.caption || '' }),
-      render: (v, ctx) =>
-        '<div class="item item-image" data-item-key="' + esc(ctx.key) +
+      render: (v, ctx) => {
+        const src = v && v.src ? msrc(v.src) : '';
+        return '<div class="item item-image" data-item-key="' + esc(ctx.key) +
         '" data-item-type="image">' +
-        (v && v.src
-          ? '<img src="' + esc(v.src) + '" alt="" draggable="false">'
+        (src
+          ? '<img src="' + esc(src) + '" alt="" draggable="false">'
           : '<span class="slot-hint">—</span>') +
-        '</div>',
-      open: (v) => { if (v && v.src) App.modal.openImage(v.src, v.caption || 'Image'); }
+        '</div>';
+      },
+      open: (v) => { if (v && v.src) App.modal.openImage(msrc(v.src), v.caption || 'Image'); }
     },
 
     audio: {
@@ -56,7 +65,7 @@
       open: (v) => App.modal.open({
         title: (v && v.caption) || 'Audio',
         html: v && v.src
-          ? '<audio controls src="' + esc(v.src) + '" style="width:100%"></audio>'
+          ? '<audio controls src="' + esc(msrc(v.src)) + '" style="width:100%"></audio>'
           : '<p>—</p>'
       })
     },
@@ -78,7 +87,7 @@
       open: (v) => App.modal.open({
         title: (v && v.caption) || 'Vidéo',
         html: v && v.src
-          ? '<video controls src="' + esc(v.src) + '" style="width:100%;max-height:70vh"></video>'
+          ? '<video controls src="' + esc(msrc(v.src)) + '" style="width:100%;max-height:70vh"></video>'
           : '<p>—</p>'
       })
     },

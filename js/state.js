@@ -11,7 +11,19 @@
       if (!this.data.config) this.data.config = App.schema.defaultConfig();
       if (!Array.isArray(this.data.rows)) this.data.rows = [];
       this._normalize();
-      this.persist();
+      // Si une hydratation média est possible, l'écriture initiale peut
+      // encore contenir des fichiers intégrés : on ne showAlert pas tout de suite.
+      const saved = this.persist(this._canHydrate() ? { quiet: true } : null);
+      if (!this._canHydrate()) return;
+      const self = this;
+      App.media.hydrate(this.data).then((changed) => {
+        if (changed) { self._touch(); }
+        if (changed || !saved) self.persist();
+      });
+    },
+
+    _canHydrate() {
+      return !!(App.media && App.media.available && typeof App.media.hydrate === 'function');
     },
 
     _normalize() {
@@ -53,13 +65,22 @@
 
     onChange(fn) { this._listeners.push(fn); },
     emit()       { this._listeners.forEach((fn) => fn(this.data)); },
-    persist() {
+    persist(opts) {
       const res = App.storage.save(this.data);
-      if (!res.ok) alert(
-        "Le stockage du navigateur est plein.\n\n" +
-        "Utilisez des URL plutôt que des fichiers importés, ou exportez vos données en JSON."
-      );
+      if (!res.ok) {
+        if (opts && opts.quiet) {
+          console.warn('[state] écriture locale impossible (médias peut-être pas encore rangés).');
+        } else {
+          alert(
+            "Le stockage du navigateur est plein.\n\n" +
+            "Les fichiers importés sont normalement rangés automatiquement dans le " +
+            "magasin de médias du navigateur (IndexedDB). Rechargez la page et réessayez ; " +
+            "sinon, préférez des URL aux fichiers importés, ou exportez vos données en JSON."
+          );
+        }
+      }
       this.emit();
+      return res.ok;
     },
     _touch() { this.data.updated = Date.now(); },
 
@@ -117,7 +138,17 @@
         throw new Error('Format de données invalide (config + rows attendus).');
       }
       this.data = data;
-      this._normalize(); this._touch(); this.persist();
+      this._normalize(); this._touch();
+      if (this._canHydrate()) {
+        const self = this;
+        this.persist({ quiet: true });
+        App.media.hydrate(this.data).then((changed) => {
+          if (changed) { self._normalize(); self._touch(); }
+          self.persist();
+        });
+      } else {
+        this.persist();
+      }
     }
   };
 })();

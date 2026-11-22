@@ -34,7 +34,10 @@
         return cache;
       }
 
-      // 3) Pas de data.js : migration v1 puis démo
+      // 3) Pas de data.js : le cache v2 valide est la donnée la plus fraîche
+      if (cache) return cache;
+
+      // 4) Migration éventuelle de l'ancien format v1, puis démo
       try {
         const old = App.utils.safeStorage.get(OLD_KEY);
         if (old) {
