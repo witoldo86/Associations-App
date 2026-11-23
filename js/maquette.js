@@ -66,7 +66,9 @@
       poolsSide: c.layout && c.layout.poolsSide === 'bottom' ? 'bottom' : 'top',
       boardCols: gridN(c.layout && c.layout.boardCols),
       poolsCols: gridN(c.layout && c.layout.poolsCols),
-      infosBesidePools: !!(c.layout && c.layout.infosBesidePools),
+      infosAside: (c.layout && c.layout.infosAside && ['board','pools','both'].indexOf(c.layout.infosAside) !== -1)
+        ? String(c.layout.infosAside)
+        : ((c.layout && c.layout.infosBesidePools) ? 'pools' : 'board'),
       modules: clone(c.modules),
       rowIds: App.state.rows().map((r) => String(r.id))
     };
@@ -266,7 +268,8 @@
     c.theme = T.resolve(draft.theme);
     c.layout = Object.assign({}, c.layout, {
       poolsSide: draft.poolsSide, boardCols: draft.boardCols, poolsCols: draft.poolsCols,
-      infosBesidePools: !!draft.infosBesidePools
+      infosAside: draft.infosAside === 'both' ? 'both' : (draft.infosAside === 'pools' ? 'pools' : 'board'),
+      infosBesidePools: draft.infosAside === 'pools'
     });
     c.modules = clone(draft.modules);
     // updateConfig déclenche onChange (le brouillon est reconstruit) :
@@ -429,15 +432,18 @@
     const poolsZone = (name, side) => zoneHtml(name, 'Réserves',
       draft.poolsSide === side ? poolsChip : '', 'mq-pools', '', GRID_BTN);
 
-    /* Panneaux d'information : à côté du plateau (défaut) ou à côté des
-       réserves, au même niveau — choix du prof dans la fenêtre Grille. */
-    const beside = !!draft.infosBesidePools;
+    /* Panneaux d'information : à côté du plateau (défaut), à côté des
+       réserves, ou pleine hauteur (encadrent les réserves ET le plateau) —
+       choix du prof dans la fenêtre Grille. */
+    const asideMode = draft.infosAside === 'both' ? 'both'
+      : (draft.infosAside === 'pools' || draft.infosBesidePools) ? 'pools' : 'board';
     const leftZone = zoneHtml('left', 'Panneau gauche', inZone('left').map(moduleChip).join(''), 'mq-side');
     const rightZone = zoneHtml('right', 'Panneau droit', inZone('right').map(moduleChip).join(''), 'mq-side');
     const columnsZone = zoneHtml('columns', 'Plateau — colonnes à associer (dans l\'ordre)',
       boardInner, 'mq-board', '', GRID_BTN);
     const mainRow = '<div class="mq-main">' +
-      (beside ? '' : leftZone) + columnsZone + (beside ? '' : rightZone) + '</div>';
+      (asideMode === 'board' ? leftZone : '') + columnsZone +
+      (asideMode === 'board' ? rightZone : '') + '</div>';
     const besideRow = '<div class="mq-beside-row">' +
       leftZone +
       (draft.poolsSide === 'top' ? poolsZone('pools-top', 'top') : poolsZone('pools-bottom', 'bottom')) +
@@ -449,11 +455,16 @@
           editBtn('title', 'Modifier le titre (texte, taille, couleur, police)') + '</div>' +
         '<div class="mq-subtitle">' + esc(App.utils.stripHtml(draft.subtitle)) +
           editBtn('subtitle', 'Modifier la consigne (texte enrichi, taille, police)') + '</div>' +
-        (beside
-          ? (draft.poolsSide === 'top'
-              ? besideRow + mainRow + poolsZone('pools-bottom', 'bottom')
-              : poolsZone('pools-top', 'top') + mainRow + besideRow)
-          : poolsZone('pools-top', 'top') + mainRow + poolsZone('pools-bottom', 'bottom')) +
+        (asideMode === 'both'
+          ? '<div class="mq-canvas">' + leftZone +
+              '<div class="mq-center">' +
+                poolsZone('pools-top', 'top') + mainRow + poolsZone('pools-bottom', 'bottom') +
+              '</div>' + rightZone + '</div>'
+          : asideMode === 'pools'
+            ? (draft.poolsSide === 'top'
+                ? besideRow + mainRow + poolsZone('pools-bottom', 'bottom')
+                : poolsZone('pools-top', 'top') + mainRow + besideRow)
+            : poolsZone('pools-top', 'top') + mainRow + poolsZone('pools-bottom', 'bottom')) +
       '</div>' +
       zoneHtml('hidden', 'Modules masqués (non affichés à l\'élève)', inZone('hidden').map(moduleChip).join(''), 'mq-hidden') +
       zoneHtml('rows', 'Ordre des lignes', rowChips(), 'mq-rows', '', SHUFFLE_BTN);

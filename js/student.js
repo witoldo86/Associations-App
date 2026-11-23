@@ -69,10 +69,14 @@
           <button type="button" class="btn" id="s-reset">Recommencer</button>
         </div>
       </div>
-      <div id="s-pools-zone"></div>
-      <div class="student-main-row">
+      <div class="student-body">
         <aside class="info-sidebar" id="s-info-left" hidden></aside>
-        <div class="board" id="board"></div>
+        <div class="student-center">
+          <div id="s-pools-zone"></div>
+          <div class="student-main-row">
+            <div class="board" id="board"></div>
+          </div>
+        </div>
         <aside class="info-sidebar" id="s-info-right" hidden></aside>
       </div>
       <p class="empty-state" id="s-empty" hidden>
@@ -133,16 +137,24 @@
     }
     $('.student').classList.toggle('pools-bottom', !!(c.layout && c.layout.poolsSide === 'bottom'));
 
-    /* Panneaux d'information : à côté du plateau (position d'origine) ou
-       à côté des réserves. On remet d'abord les asides dans la rangée
-       principale AVANT de réécrire le contenu de la zone des réserves. */
+    /* Panneaux d'information : à côté du plateau (position d'origine), à
+       côté des réserves, ou pleine hauteur (encadrent les réserves ET le
+       plateau, sur toute la hauteur de l'exercice). On détache d'abord les
+       asides AVANT de réécrire le contenu de la zone des réserves. */
     const zone = $('#s-pools-zone');
     const mainRow = root.querySelector('.student-main-row');
+    const bodyRow = root.querySelector('.student-body');
+    const center = root.querySelector('.student-center');
     const asideL = $('#s-info-left');
     const asideR = $('#s-info-right');
-    const beside = !!(c.layout && c.layout.infosBesidePools);
-    if (asideL && asideL.parentElement !== mainRow) mainRow.insertBefore(asideL, document.getElementById('board'));
-    if (asideR && asideR.parentElement !== mainRow) mainRow.appendChild(asideR);
+    const asideMode = (c.layout && c.layout.infosAside && ['board','pools','both'].indexOf(c.layout.infosAside) !== -1)
+      ? String(c.layout.infosAside)
+      : ((c.layout && c.layout.infosBesidePools) ? 'pools' : 'board');
+    const move = (aside, parent, before) => {
+      if (aside && aside.parentElement !== parent) parent.insertBefore(aside, before || null);
+    };
+    move(asideL, bodyRow, center);
+    move(asideR, bodyRow, null);
     zone.classList.remove('pools-with-infos');
     zone.classList.remove('has-expanded-module');
     const poolPlan = gridPlan(mods, c.layout && c.layout.poolsCols, 'poolSpan');
@@ -183,10 +195,13 @@
      '<div class="pools' + (poolPlan.lines > 1 ? ' pools-rows' : '') +
       '" style="--cols:' + poolPlan.cols + (poolPlan.lines > 1 ? '' : ';--cols-tpl:' + poolPlan.tpl) + '">' +
       poolsInner + '</div>';
-    if (beside) {
+    if (asideMode === 'pools') {
       zone.classList.add('pools-with-infos');
       zone.insertBefore(asideL, zone.firstChild);
       zone.appendChild(asideR);
+    } else if (asideMode === 'board') {
+      move(asideL, mainRow, document.getElementById('board'));
+      move(asideR, mainRow, null);
     }
     expandedModuleId = null;
 
