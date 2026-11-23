@@ -17,9 +17,12 @@
   // Zones recevant un bouton « + » d'ajout de module
   const ADD_ZONE = { columns: 'columns', 'pools-top': 'pools', 'pools-bottom': 'pools', left: 'left', right: 'right', hidden: 'hidden' };
 
-  const chipActions = (id, withColor) =>
+  const chipActions = (id, withColor, withContents) =>
     '<span class="mq-acts">' +
       '<button type="button" class="mq-act" data-mq-act="edit" data-act-id="' + esc(id) + '" title="Éditer ce module">✎</button>' +
+      (withContents
+        ? '<button type="button" class="mq-act" data-mq-act="contents" data-act-id="' + esc(id) + '" title="Éditer les contenus, ligne par ligne">📝</button>'
+        : '') +
       '<button type="button" class="mq-act" data-mq-act="view" data-act-id="' + esc(id) + '" title="Visualiser les contenus">📄</button>' +
       (withColor
         ? '<button type="button" class="mq-act" data-mq-act="color" data-act-id="' + esc(id) + '" title="Couleur du bac (réserves)">🎨</button>'
@@ -63,6 +66,7 @@
       poolsSide: c.layout && c.layout.poolsSide === 'bottom' ? 'bottom' : 'top',
       boardCols: gridN(c.layout && c.layout.boardCols),
       poolsCols: gridN(c.layout && c.layout.poolsCols),
+      infosBesidePools: !!(c.layout && c.layout.infosBesidePools),
       modules: clone(c.modules),
       rowIds: App.state.rows().map((r) => String(r.id))
     };
@@ -80,11 +84,9 @@
   const options = (table) => Object.keys(table).map((k) =>
     '<option value="' + k + '">' + esc(table[k].label) + '</option>').join('');
 
-
-  // Police « comme le layout » = option vide (la police générale s'applique)
-  const fontOptions = (cur) => '<option value=""' + (!cur ? ' selected' : '') +
-    '>Comme le layout</option>' + options(T.FONTS);
-
+  /* Les polices ne se choisissent plus ici : le titre et la consigne dans
+     leurs fenêtres d'édition (bouton ✎ de l'aperçu), les contenus dans chaque
+     éditeur de texte enrichi. Le texte simple utilise la police système. */
   function styleBarHtml() {
     return `
       <div class="mq-stylebar">
@@ -97,12 +99,6 @@
           <div class="field field-auto"><label for="mq-ink">Texte</label>
             <input id="mq-ink" type="color" data-mq="theme.ink"></div>
         </div>
-        <div class="field"><label for="mq-font">Police (layout, contenus)</label>
-          <select id="mq-font" data-mq="theme.font">${options(T.FONTS)}</select></div>
-        <div class="field"><label for="mq-titlefont">Police du titre</label>
-          <select id="mq-titlefont" data-mq="theme.titleFont">${fontOptions(draft && draft.theme.titleFont)}</select></div>
-        <div class="field"><label for="mq-subtitlefont">Police de la consigne</label>
-          <select id="mq-subtitlefont" data-mq="theme.subtitleFont">${fontOptions(draft && draft.theme.subtitleFont)}</select></div>
         <div class="field"><label for="mq-scale">Taille du texte</label>
           <select id="mq-scale" data-mq="theme.scale">${options(T.SCALES)}</select></div>
         <div class="field"><label for="mq-radius">Coins</label>
@@ -125,8 +121,9 @@
         ajoutez-en avec le bouton <strong>＋</strong> de chaque zone, éditez/visualisez/supprimez
         avec <strong>✎ 📄 🗑</strong> au survol des blocs, modifiez le titre, la consigne
         et la grille avec les boutons <strong>✎</strong> et <strong>⌗</strong> de l'aperçu, et mélangez
-        les lignes avec <strong>🔀</strong> (espace « Ordre des lignes »). Les couleurs, la police,
-        la taille du texte et les coins se règlent dans le cadre « Style général » au-dessus.
+        les lignes avec <strong>🔀</strong> (espace « Ordre des lignes »). Les couleurs,
+        la taille du texte et les coins se règlent dans le cadre « Style général » ;
+        chaque police se choisit dans sa fenêtre d'édition (titre, consigne, contenus).
         Chaque réglage est
         <strong>enregistré automatiquement</strong> (indicateur en haut à droite) et aussitôt
         visible dans les espaces élève et prof.
@@ -210,6 +207,7 @@
       const A = App.teacher;
       if (!id || !A) return;
       if (act.dataset.mqAct === 'edit') A.editModule(id);
+      else if (act.dataset.mqAct === 'contents') A.editInfoContents(id);
       else if (act.dataset.mqAct === 'view') A.moduleContents(id);
       else if (act.dataset.mqAct === 'color') openPoolColorDialog(id);
       else if (act.dataset.mqAct === 'del') A.removeModule(id);
@@ -267,7 +265,8 @@
     c.subtitle = draft.subtitle.trim();
     c.theme = T.resolve(draft.theme);
     c.layout = Object.assign({}, c.layout, {
-      poolsSide: draft.poolsSide, boardCols: draft.boardCols, poolsCols: draft.poolsCols
+      poolsSide: draft.poolsSide, boardCols: draft.boardCols, poolsCols: draft.poolsCols,
+      infosBesidePools: !!draft.infosBesidePools
     });
     c.modules = clone(draft.modules);
     // updateConfig déclenche onChange (le brouillon est reconstruit) :
@@ -310,7 +309,7 @@
       '<span class="mq-grip" aria-hidden="true">⣿</span>' +
       '<span class="mq-name">' + esc(modLabel(m)) + '</span>' +
       badge + lock +
-      chipActions(m.id) + '</div>';
+      chipActions(m.id, false, m.role !== 'associate') + '</div>';
   }
 
   function zoneHtml(name, title, inner, cls, itemsAttr, labelExtra) {
@@ -430,20 +429,30 @@
     const poolsZone = (name, side) => zoneHtml(name, 'Réserves',
       draft.poolsSide === side ? poolsChip : '', 'mq-pools', '', GRID_BTN);
 
+    /* Panneaux d'information : à côté du plateau (défaut) ou à côté des
+       réserves, au même niveau — choix du prof dans la fenêtre Grille. */
+    const beside = !!draft.infosBesidePools;
+    const leftZone = zoneHtml('left', 'Panneau gauche', inZone('left').map(moduleChip).join(''), 'mq-side');
+    const rightZone = zoneHtml('right', 'Panneau droit', inZone('right').map(moduleChip).join(''), 'mq-side');
+    const columnsZone = zoneHtml('columns', 'Plateau — colonnes à associer (dans l\'ordre)',
+      boardInner, 'mq-board', '', GRID_BTN);
+    const mainRow = '<div class="mq-main">' +
+      (beside ? '' : leftZone) + columnsZone + (beside ? '' : rightZone) + '</div>';
+    const besideRow = '<div class="mq-beside-row">' +
+      (draft.poolsSide === 'top' ? poolsZone('pools-top', 'top') : poolsZone('pools-bottom', 'bottom')) +
+      leftZone + rightZone + '</div>';
+
     $('#mq-preview').innerHTML =
       '<div class="mq-screen" style="' + esc(style) + '">' +
         '<div class="mq-title">' + esc(draft.title || 'Titre') +
           editBtn('title', 'Modifier le titre (texte, taille, couleur, police)') + '</div>' +
-        '<div class="mq-subtitle">' + esc(draft.subtitle) +
-          editBtn('subtitle', 'Modifier la consigne (texte, taille, police)') + '</div>' +
-        poolsZone('pools-top', 'top') +
-        '<div class="mq-main">' +
-          zoneHtml('left', 'Panneau gauche', inZone('left').map(moduleChip).join(''), 'mq-side') +
-          zoneHtml('columns', 'Plateau — colonnes à associer (dans l\'ordre)',
-            boardInner, 'mq-board', '', GRID_BTN) +
-          zoneHtml('right', 'Panneau droit', inZone('right').map(moduleChip).join(''), 'mq-side') +
-        '</div>' +
-        poolsZone('pools-bottom', 'bottom') +
+        '<div class="mq-subtitle">' + esc(App.utils.stripHtml(draft.subtitle)) +
+          editBtn('subtitle', 'Modifier la consigne (texte enrichi, taille, police)') + '</div>' +
+        (beside
+          ? (draft.poolsSide === 'top'
+              ? besideRow + mainRow + poolsZone('pools-bottom', 'bottom')
+              : poolsZone('pools-top', 'top') + mainRow + besideRow)
+          : poolsZone('pools-top', 'top') + mainRow + poolsZone('pools-bottom', 'bottom')) +
       '</div>' +
       zoneHtml('hidden', 'Modules masqués (non affichés à l\'élève)', inZone('hidden').map(moduleChip).join(''), 'mq-hidden') +
       zoneHtml('rows', 'Ordre des lignes', rowChips(), 'mq-rows', '', SHUFFLE_BTN);
