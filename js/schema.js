@@ -50,70 +50,89 @@
 
     audio: {
       label: 'Son',
-      createEmpty: () => ({ src: '', caption: '' }),
-      validate: (v) => !!(v && typeof v.src === 'string' && v.src.length),
+      createEmpty: () => ({ src: '', caption: '', html: '' }),
+      validate: (v) => !!(v && (
+        (typeof v.src === 'string' && v.src.length) ||
+        (typeof v.html === 'string' && v.html.replace(/<[^>]+>/g, '').trim().length))),
       summary:  (v) => (v && v.caption) || '(son)',
       formSchema: (v) => [
         { name:'src',     type:'url-or-file', label:'Audio', value:(v&&v.src)||'', accept:'audio/*' },
-        { name:'caption', type:'text',        label:'Titre (facultatif)', value:(v&&v.caption)||'' }
+        { name:'caption', type:'text',        label:'Titre (facultatif)', value:(v&&v.caption)||'' },
+        { name:'html',    type:'richtext',    label:'Présentation (facultatif)', value:(v&&v.html)||'' }
       ],
-      build: (f) => ({ src: f.src, caption: f.caption || '' }),
+      build: (f) => ({ src: f.src, caption: f.caption || '', html: App.utils.sanitizeRich(f.html || '') }),
       render: (v, ctx) =>
         '<div class="item item-audio" data-item-key="' + esc(ctx.key) +
         '" data-item-type="audio"><span class="audio-icon">▶</span>' +
         '<span>' + esc((v && v.caption) || 'Son') + '</span></div>',
       open: (v) => App.modal.open({
         title: (v && v.caption) || 'Audio',
-        html: v && v.src
+        html: (v && v.src
           ? '<audio controls src="' + esc(msrc(v.src)) + '" style="width:100%"></audio>'
-          : '<p>—</p>'
+          : '<p>—</p>') +
+        (v && v.html
+          ? '<div class="modal-rich" style="margin-top:.75rem">' + App.utils.resolveMediaInHtml(v.html) + '</div>'
+          : '')
       })
     },
 
     video: {
       label: 'Vidéo',
-      createEmpty: () => ({ src: '', caption: '' }),
-      validate: (v) => !!(v && typeof v.src === 'string' && v.src.length),
+      createEmpty: () => ({ src: '', caption: '', html: '' }),
+      validate: (v) => !!(v && (
+        (typeof v.src === 'string' && v.src.length) ||
+        (typeof v.html === 'string' && v.html.replace(/<[^>]+>/g, '').trim().length))),
       summary:  (v) => (v && v.caption) || '(vidéo)',
       formSchema: (v) => [
         { name:'src',     type:'url-or-file', label:'Vidéo (mp4 / webm)', value:(v&&v.src)||'', accept:'video/*' },
-        { name:'caption', type:'text',        label:'Titre (facultatif)', value:(v&&v.caption)||'' }
+        { name:'caption', type:'text',        label:'Titre (facultatif)', value:(v&&v.caption)||'' },
+        { name:'html',    type:'richtext',    label:'Présentation (facultatif)', value:(v&&v.html)||'' }
       ],
-      build: (f) => ({ src: f.src, caption: f.caption || '' }),
+      build: (f) => ({ src: f.src, caption: f.caption || '', html: App.utils.sanitizeRich(f.html || '') }),
       render: (v, ctx) =>
         '<div class="item item-video" data-item-key="' + esc(ctx.key) +
         '" data-item-type="video"><span class="video-icon">▶</span>' +
         '<span>' + esc((v && v.caption) || 'Vidéo') + '</span></div>',
       open: (v) => App.modal.open({
         title: (v && v.caption) || 'Vidéo',
-        html: v && v.src
-          ? '<video controls src="' + esc(msrc(v.src)) + '" style="width:100%;max-height:70vh"></video>'
-          : '<p>—</p>'
+        html: (v && v.src
+          ? '<video controls src="' + esc(msrc(v.src)) + '" style="width:100%;max-height:60vh"></video>'
+          : '<p>—</p>') +
+        (v && v.html
+          ? '<div class="modal-rich" style="margin-top:.75rem">' + App.utils.resolveMediaInHtml(v.html) + '</div>'
+          : '')
       })
     },
 
     url: {
       label: 'Page web',
-      createEmpty: () => ({ src: '', caption: '' }),
-      validate: (v) => !!(v && typeof v.src === 'string' && /^https?:\/\//i.test(v.src)),
+      createEmpty: () => ({ src: '', caption: '', html: '' }),
+      validate: (v) => !!(v && (
+        (typeof v.src === 'string' && /^https?:\/\//i.test(v.src)) ||
+        (typeof v.html === 'string' && v.html.replace(/<[^>]+>/g, '').trim().length))),
       summary:  (v) => (v && v.caption) || (v && v.src) || '',
       formSchema: (v) => [
         { name:'src',     type:'url',  label:'URL (https://…)', value:(v&&v.src)||'' },
-        { name:'caption', type:'text', label:'Titre (facultatif)', value:(v&&v.caption)||'' }
+        { name:'caption', type:'text', label:'Titre (facultatif)', value:(v&&v.caption)||'' },
+        { name:'html',    type:'richtext', label:'Présentation (facultatif)', value:(v&&v.html)||'' }
       ],
-      build: (f) => ({ src: f.src, caption: f.caption || '' }),
+      build: (f) => ({ src: f.src, caption: f.caption || '', html: App.utils.sanitizeRich(f.html || '') }),
       render: (v, ctx) =>
         '<div class="item item-url" data-item-key="' + esc(ctx.key) +
         '" data-item-type="url"><span class="url-icon">🌐</span>' +
         '<span>' + esc((v && v.caption) || 'Page') + '</span></div>',
       open: (v) => {
-        if (!v || !v.src) return;
-        App.modal.open({
-          title: (v && v.caption) || 'Page web',
-          html: '<iframe src="' + esc(v.src) + '" style="width:100%;height:70vh;border:0" ' +
-                'sandbox="allow-scripts allow-same-origin"></iframe>' +
-                '<p><a href="' + esc(v.src) + '" target="_blank" rel="noopener">Ouvrir dans un nouvel onglet</a></p>'
-        });
+        if (!v) return;
+        const page = v.src
+          ? '<iframe src="' + esc(v.src) + '" style="width:100%;height:60vh;border:0" ' +
+            'sandbox="allow-scripts allow-same-origin"></iframe>' +
+            '<p style="margin:.5rem 0 0"><a href="' + esc(v.src) + '" target="_blank" rel="noopener">Ouvrir dans un nouvel onglet</a></p>'
+          : '';
+        const rich = v.html
+          ? '<div class="modal-rich" style="margin-top:.75rem">' + App.utils.resolveMediaInHtml(v.html) + '</div>'
+          : '';
+        if (!page && !rich) return;
+        App.modal.open({ title: (v && v.caption) || 'Page web', html: page + rich });
       }
     },
 
@@ -132,11 +151,11 @@
         '<div class="item item-info" data-item-key="' + esc(ctx.key) +
         '" data-item-type="richtext">' +
         (v && v.title ? '<strong>' + esc(v.title) + '</strong>' : '') +
-        '<div class="rich clamp">' + ((v && v.html) || '') + '</div>' +
+        '<div class="rich clamp">' + ((v && v.html) ? App.utils.resolveMediaInHtml(v.html) : '') + '</div>' +
         '</div>',
       open: (v) => App.modal.open({
         title: (v && v.title) || 'Cartel',
-        html: '<div class="modal-rich">' + ((v && v.html) || '') + '</div>'
+        html: '<div class="modal-rich">' + ((v && v.html) ? App.utils.resolveMediaInHtml(v.html) : '') + '</div>'
       })
     }
   };
@@ -159,6 +178,14 @@
     return { src: String(v), caption: '' };
   }
 
+  /* Comme coerceMedia mais préserve la présentation enrichie (html) :
+     son, vidéo et page web acceptent un texte enrichi sous le média. */
+  function coerceMediaRich(v) {
+    const base = coerceMedia(v);
+    if (v && typeof v === 'object' && v.html != null) base.html = String(v.html);
+    return base;
+  }
+
   const COERCERS = {
     text(v) {
       if (v == null) return '';
@@ -168,9 +195,9 @@
       return String(v);
     },
     image: coerceMedia,
-    audio: coerceMedia,
-    video: coerceMedia,
-    url: coerceMedia,
+    audio: coerceMediaRich,
+    video: coerceMediaRich,
+    url: coerceMediaRich,
     richtext(v) {
       if (v == null) return { title: '', html: '' };
       // Chaîne ancienne : HTML brut conservé tel quel (sanitizeRich l'assainit ensuite)
