@@ -46,27 +46,35 @@
     const sizes = isTitle ? App.theme.TITLE_SIZES : App.theme.SUBTITLE_SIZES;
     const sizeKey = isTitle ? 'titleSize' : 'subtitleSize';
     const value = isTitle ? (c.title || '') : (c.subtitle || '');
-    const font = App.theme.FONTS[t.font] ? t.font : 'system';
     const sizeVal = App.theme.resolve(t)[sizeKey];
     const fontKey = isTitle ? 'titleFont' : 'subtitleFont';
     const ownFont = t[fontKey] || '';
+    /* Seule la police du paramètre concerné ; la police d'interface reste
+       le réglage global par défaut (elle se règle dans chaque éditeur riche). */
     const fontOpts = Object.keys(App.theme.FONTS).map((k) =>
-      '<option value="' + k + '"' + (k === font ? ' selected' : '') + '>' +
+      '<option value="' + k + '"' + (k === ownFont ? ' selected' : '') + '>' +
       esc(App.theme.FONTS[k].label) + '</option>').join('');
     const ownFontOpts = '<option value=""' + (!ownFont ? ' selected' : '') + '>' +
-      'Comme tout l\'exercice</option>' + fontOpts;
+      'Par défaut (syst\u00e8me)</option>' + fontOpts;
     const sizeOpts = Object.keys(sizes).map((k) =>
       '<option value="' + k + '"' + (k === sizeVal ? ' selected' : '') + '>' +
       esc(sizes[k].label) + '</option>').join('');
+
+    const contentField = isTitle
+      ? '<input id="tx-content" type="text" value="' + esc(value) + '">'
+      : '<div class="rte" data-rte-module="__subtitle__" data-rte-field="subtitle">' +
+          rteToolbarHtml() +
+          '<div class="rte-editor" contenteditable="true" ' +
+          'data-placeholder="Consigne (ce que verra l\u2019\u00e9l\u00e8ve)">' + rteEditorHtml(value) + '</div>' +
+        '</div>';
+
     App.modal.open({
       title: isTitle ? 'Modifier le titre' : 'Modifier la consigne',
       html:
-        '<form id="tx-form" novalidate>' +
+        '<form id="tx-form" novalidate onsubmit="return false">' +
           '<div class="field"><label for="tx-content">' +
-            (isTitle ? 'Titre' : 'Consigne (ce que verra l’élève)') + '</label>' +
-            (isTitle
-              ? '<input id="tx-content" type="text" value="' + esc(value) + '">'
-              : '<textarea id="tx-content" rows="2">' + esc(value) + '</textarea>') + '</div>' +
+            (isTitle ? 'Titre' : 'Consigne (ce que verra l\u2019\u00e9l\u00e8ve)') + '</label>' +
+            contentField + '</div>' +
           '<div class="inline">' +
             '<div class="field"><label for="tx-size">Taille</label>' +
               '<select id="tx-size">' + sizeOpts + '</select></div>' +
@@ -76,8 +84,6 @@
                 esc(t.titleColor || t.ink || '#1f2937') + '">' +
                 '<button type="button" class="btn link" id="tx-color-auto">Auto</button></span></div>'
               : '') +
-            '<div class="field"><label for="tx-font">Police de tout l’exercice (layout, contenus)</label>' +
-              '<select id="tx-font">' + fontOpts + '</select></div>' +
             '<div class="field"><label for="tx-tfont">Police ' +
               (isTitle ? 'du titre' : 'de la consigne') + '</label>' +
               '<select id="tx-tfont">' + ownFontOpts + '</select></div>' +
@@ -88,6 +94,7 @@
           '</div>' +
         '</form>'
     });
+
     let autoColor = false;
     const colorInput = document.getElementById('tx-color');
     if (isTitle) {
@@ -99,23 +106,29 @@
     }
     document.getElementById('tx-save').addEventListener('click', () => {
       const c2 = cloneData(cfg());
-      const content = String(document.getElementById('tx-content').value).trim();
       c2.theme = Object.assign({}, c2.theme, {
-        font: document.getElementById('tx-font').value
+        [sizeKey]: document.getElementById('tx-size').value,
+        [fontKey]: document.getElementById('tx-tfont').value
       });
-      c2.theme[sizeKey] = document.getElementById('tx-size').value;
-      c2.theme[fontKey] = document.getElementById('tx-tfont').value;
       if (isTitle) {
-        c2.title = content;
+        c2.title = String(document.getElementById('tx-content').value).trim();
         c2.theme.titleColor = autoColor ? '' : (colorInput.value || '');
       } else {
-        c2.subtitle = content;
+        const editor = document.querySelector(
+          '[data-rte-module="__subtitle__"][data-rte-field="subtitle"] .rte-editor');
+        const raw = editor ? editor.innerHTML : '';
+        const withRefs = App.utils.htmlWithMediaRefs ? App.utils.htmlWithMediaRefs(raw) : raw;
+        c2.subtitle = App.utils.sanitizeRich(withRefs);
       }
       c2.theme = App.theme.resolve(c2.theme);
       App.state.updateConfig(c2);
       App.modal.close();
     });
-    document.getElementById('tx-content').focus();
+    bindFieldEvents(document.getElementById('tx-form'));
+    const focusEl = isTitle
+      ? document.getElementById('tx-content')
+      : document.querySelector('[data-rte-module="__subtitle__"] .rte-editor');
+    if (focusEl) focusEl.focus();
   }
 
   function openGridDialog() {
@@ -132,6 +145,11 @@
             '<select id="gd-board">' + opts(gridNLocal(l.boardCols)) + '</select></div>' +
           '<div class="field"><label for="gd-pools">Réserves : modules par ligne</label>' +
             '<select id="gd-pools">' + opts(gridNLocal(l.poolsCols)) + '</select></div>' +
+          '<div class="field"><label for="gd-infos">Panneaux d\'information (gauche / droite)</label>' +
+            '<select id="gd-infos">' +
+              '<option value="board"' + (!l.infosBesidePools ? ' selected' : '') + '>À côté du plateau (défaut)</option>' +
+              '<option value="pools"' + (l.infosBesidePools ? ' selected' : '') + '>À côté des réserves (au même niveau)</option>' +
+            '</select></div>' +
           '<p class="hint">Le <strong>plateau</strong> est la zone où l’élève dépose ses réponses ; ' +
             'les <strong>réserves</strong> sont les bacs d’où il pioche les éléments. ' +
             'Dans chaque ligne, les largeurs réglées avec les poignées sont conservées.</p>' +
@@ -145,7 +163,8 @@
       const c2 = cloneData(cfg());
       c2.layout = Object.assign({}, c2.layout, {
         boardCols: gridNLocal(document.getElementById('gd-board').value),
-        poolsCols: gridNLocal(document.getElementById('gd-pools').value)
+        poolsCols: gridNLocal(document.getElementById('gd-pools').value),
+        infosBesidePools: document.getElementById('gd-infos').value === 'pools'
       });
       App.state.updateConfig(c2);
       App.modal.close();
@@ -271,6 +290,34 @@
     const zoneOk = isNew && ['columns', 'pools', 'left', 'right', 'hidden'].indexOf(zone) !== -1;
     const presetRole = zoneOk ? (zone === 'columns' || zone === 'pools' ? 'associate' : 'informative') : null;
 
+    /* Apparition conditionnelle des modules informatifs : dès qu'une des
+       lignes cochées est complétée par l'élève. */
+    const isInfo = isNew ? presetRole === 'informative' : m.role === 'informative';
+    const rowList = isNew || isInfo ? App.state.rows() : [];
+    const revealSet = new Set((m && Array.isArray(m.revealRows)) ? m.revealRows.map(String) : []);
+    const firstAssoc = allMods().find((x) => x.role === 'associate');
+    const rowLabelOf = (r, i) => {
+      let txt = '';
+      const vt = firstAssoc && App.schema.Types[firstAssoc.kind];
+      if (vt && r.cells && r.cells[firstAssoc.id] != null) txt = String(vt.summary(r.cells[firstAssoc.id]) || '');
+      if (txt.length > 30) txt = txt.slice(0, 30) + '…';
+      return 'Ligne ' + (i + 1) + (txt ? ' — ' + txt : ' (vide)');
+    };
+    const revealBlock = isInfo
+      ? `<fieldset class="module-fieldset">
+          <legend>Apparition du panneau (optionnel)</legend>
+          <div class="hint" style="margin-bottom:.3rem">Le panneau d'information apparaît dès que l'élève complète
+            l'une des lignes cochées. Sans coche : toujours visible.
+            ${rowList.length ? '' : 'Créez d’abord des lignes pour pouvoir les cocher.'}</div>
+          <div class="inline">
+          ${rowList.map((r, i) => `
+            <label class="inline" style="gap:.3rem">
+              <input type="checkbox" data-reveal-row="${esc(String(r.id))}" ${revealSet.has(String(r.id)) ? 'checked' : ''}>
+              ${esc(rowLabelOf(r, i))}
+            </label>`).join('')}
+          </div>
+        </fieldset>`
+      : '';
     return `
     <form id="module-form" novalidate>
       <input id="mf-zone" type="hidden" value="${zoneOk ? esc(zone) : ''}">
@@ -324,6 +371,8 @@
           Cliquable chez l'élève (modules informatifs : ouvre le contenu en grand dans une fenêtre)
         </label>
       </div>
+      ${revealBlock}
+      ${isInfo ? '<p class="hint">Contenu informatif : il s\'édite ligne par ligne avec le bouton 📝 du bloc, dans la maquette (pas dans les lignes de l\'exercice).</p>' : ''}
       <div class="form-actions">
         <button type="submit" class="btn primary" id="mf-save">${isNew ? 'Ajouter' : 'Enregistrer'}</button>
         <button type="button" class="btn" id="mf-cancel">Annuler</button>
@@ -405,9 +454,14 @@
 
     const poolColsRaw = document.getElementById('mf-poolcols').value;
     const clickableEl = document.getElementById('mf-clickable');
+    const revealChecked = [...document.querySelectorAll('input[data-reveal-row]:checked')]
+      .map((x) => x.dataset.revealRow);
     const payload = { id, label, kind, role, unlockAfter,
       poolCols: poolColsRaw ? Number(poolColsRaw) : null,
-      clickable: !!(clickableEl && clickableEl.checked) };
+      clickable: !!(clickableEl && clickableEl.checked),
+      /* Panneau informatif visible dès qu'une des lignes cochées est
+         complétée par l'élève (liste vide = toujours visible). */
+      revealRows: role === 'informative' ? revealChecked : [] };
 
     if (editingModuleId == null) {
       const zoneEl = document.getElementById('mf-zone');
@@ -501,6 +555,55 @@
   }
 
   /* =========================================================
+     CONTENUS D'INFORMATION — une fenêtre dédiée, ligne par ligne
+     Les modules informatifs ne figurent plus dans le formulaire des
+     lignes : tout leur contenu s'édite ici (bouton 📝 dans la maquette).
+     ========================================================= */
+  function openInfoContents(moduleId) {
+    const m = allMods().find((x) => String(x.id) === String(moduleId));
+    if (!m) return;
+    const rows = App.state.rows();
+    if (!rows.length) {
+      alert("Cr\u00e9ez d'abord au moins une ligne : les contenus d'information sont d\u00e9finis ligne par ligne.");
+      return;
+    }
+    const type = App.schema.Types[m.kind];
+    const keyOf = (r) => m.id + '__' + String(r.id);
+    const body = rows.map((r, i) => {
+      const v = r.cells[m.id] != null ? r.cells[m.id] : type.createEmpty();
+      return '<div class="info-row-block"><h4 class="info-row-title">Ligne ' + (i + 1) + '</h4>' +
+        renderModuleFieldset(m, v, keyOf(r)) + '</div>';
+    }).join('');
+
+    App.modal.open({
+      title: 'Contenus d\'information : ' + (m.label || m.id),
+      html:
+        '<form id="info-form" novalidate onsubmit="return false">' +
+        '<p class="hint">Un contenu par ligne : chez l\'\u00e9l\u00e8ve, le panneau affiche ' +
+        'les contenus des lignes correspondantes (selon la condition d\'apparition choisie ' +
+        'dans la fen\u00eatre du module).</p>' +
+        body +
+        '<div class="form-actions">' +
+          '<button type="button" class="btn" data-close>Fermer</button>' +
+          '<button type="button" class="btn primary" id="info-save">Enregistrer</button>' +
+        '</div>' +
+        '</form>'
+    });
+
+    document.getElementById('info-save').addEventListener('click', () => {
+      const updates = rows.map((r) => ({
+        id: r.id,
+        cells: { [m.id]: App.schema.buildPayload(m.kind, collectFields(m.kind, keyOf(r))) }
+      }));
+      App.state.updateRowsBulk(updates);
+      App.modal.close();
+      renderRows();
+    });
+    bindFieldEvents(document.getElementById('info-form'));
+  }
+  T.editInfoContents = openInfoContents;
+
+  /* =========================================================
      PANNEAU LIGNES
      ========================================================= */
 function panelRows() {
@@ -536,7 +639,7 @@ function onToggleFlattenAll() {
 
   function renderRows() {
     const rows = App.state.rows();
-    const mods = allMods();
+    const mods = allMods().filter((m) => m.role === 'associate');
     $('#row-count').textContent = rows.length;
     const toggleBtn = $('#rows-toggle-flatten');
     if (toggleBtn) {
@@ -651,9 +754,11 @@ $('#row-list').innerHTML = rows.map((r, i) => {
      FORMULAIRE LIGNE — dans une MODAL
      ========================================================= */
   function showRowForm(row) {
-    const mods = allMods();
+    /* Les modules informatifs ne figurent plus dans les lignes :
+       leurs contenus s'éditent ligne par ligne (bouton 📝 dans la maquette). */
+    const mods = allMods().filter((m) => m.role === 'associate');
     if (!mods.length) {
-      alert('Créez d\'abord au moins un module.');
+      alert('Créez d\'abord au moins un module « à associer » (dans la maquette).');
       return;
     }
     const formFields = mods.map((m) => {
@@ -805,13 +910,14 @@ $('#row-list').innerHTML = rows.map((r, i) => {
     });
   }
 
-  function renderModuleFieldset(m, value) {
+  function renderModuleFieldset(m, value, idKey) {
     const type = App.schema.Types[m.kind];
     const fields = type.formSchema(value || type.createEmpty());
+    const key = idKey || m.id;
     return `
       <fieldset class="module-fieldset" data-module="${esc(m.id)}">
         <legend>${esc(m.label || m.id)} <span class="badge">${esc(type.label)}</span></legend>
-        ${fields.map((f) => renderField(m.id, f)).join('')}
+        ${fields.map((f) => renderField(key, f)).join('')}
       </fieldset>`;
   }
 
@@ -862,41 +968,7 @@ $('#row-list').innerHTML = rows.map((r, i) => {
         <div class="field">
           <label>${label}</label>
           <div class="rte" data-rte-module="${esc(moduleId)}" data-rte-field="${esc(field.name)}">
-            <div class="rte-toolbar">
-              <button type="button" class="rte-btn" data-cmd="bold" title="Gras"><b>G</b></button>
-              <button type="button" class="rte-btn" data-cmd="italic" title="Italique"><i>I</i></button>
-              <button type="button" class="rte-btn" data-cmd="underline" title="Souligné"><u>S</u></button>
-              <span class="rte-sep"></span>
-              <select class="rte-select rte-font" title="Police d'écriture" aria-label="Police d'écriture">
-                <option value="">Police par défaut</option>
-                <option value="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif">Sans-serif (système)</option>
-                <option value="Georgia, 'Times New Roman', serif">Serif (Georgia)</option>
-                <option value="'Trebuchet MS', sans-serif">Trebuchet</option>
-                <option value="Verdana, sans-serif">Verdana</option>
-                <option value="'Courier New', monospace">Monospace</option>
-              </select>
-              <select class="rte-select rte-size" title="Taille du texte" aria-label="Taille du texte">
-                <option value="">Taille</option>
-                <option value="0.85rem">Petit</option>
-                <option value="1rem">Normal</option>
-                <option value="1.2rem">Grand</option>
-                <option value="1.45rem">Très grand</option>
-              </select>
-              <select class="rte-select rte-lineheight" title="Interlignage" aria-label="Interlignage">
-                <option value="">Interligne</option>
-                <option value="1.2">Serré (1,2)</option>
-                <option value="1.5">Standard (1,5)</option>
-                <option value="1.85">Aéré (1,85)</option>
-                <option value="2.2">Large (2,2)</option>
-              </select>
-              <span class="rte-sep"></span>
-              <label class="rte-color"><input type="color" class="rte-color-input" data-color="fore" value="#dc2626"><span>Couleur</span></label>
-              <label class="rte-color"><input type="color" class="rte-color-input" data-color="back" value="#fef3c7"><span>Surligner</span></label>
-              <span class="rte-sep"></span>
-              <button type="button" class="rte-btn" data-action="rte-image" title="Insérer une image">🖼</button>
-              <button type="button" class="rte-btn" data-cmd="clear" title="Effacer la mise en forme">✕</button>
-              <button type="button" class="rte-btn rte-student-preview" data-action="student-preview" title="Voir / éditer tel que vu par l'élève">👁</button>
-            </div>
+            ${rteToolbarHtml()}
             <div class="rte-editor" contenteditable="true" data-placeholder="${esc(field.label||'')}">${rteEditorHtml(value)}</div>
           </div>
         </div>`;
@@ -944,6 +1016,46 @@ $('#row-list').innerHTML = rows.map((r, i) => {
     return value;
   }
 
+  /* Barre d'outils commune à tous les éditeurs riches. */
+  function rteToolbarHtml() {
+    return `
+            <div class="rte-toolbar">
+              <button type="button" class="rte-btn" data-cmd="bold" title="Gras"><b>G</b></button>
+              <button type="button" class="rte-btn" data-cmd="italic" title="Italique"><i>I</i></button>
+              <button type="button" class="rte-btn" data-cmd="underline" title="Souligné"><u>S</u></button>
+              <span class="rte-sep"></span>
+              <select class="rte-select rte-font" title="Police d'écriture" aria-label="Police d'écriture">
+                <option value="">Police par défaut</option>
+                <option value="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif">Sans-serif (système)</option>
+                <option value="Georgia, 'Times New Roman', serif">Serif (Georgia)</option>
+                <option value="'Trebuchet MS', sans-serif">Trebuchet</option>
+                <option value="Verdana, sans-serif">Verdana</option>
+                <option value="'Courier New', monospace">Monospace</option>
+              </select>
+              <select class="rte-select rte-size" title="Taille du texte" aria-label="Taille du texte">
+                <option value="">Taille</option>
+                <option value="0.85rem">Petit</option>
+                <option value="1rem">Normal</option>
+                <option value="1.2rem">Grand</option>
+                <option value="1.45rem">Très grand</option>
+              </select>
+              <select class="rte-select rte-lineheight" title="Interlignage" aria-label="Interlignage">
+                <option value="">Interligne</option>
+                <option value="1.2">Serré (1,2)</option>
+                <option value="1.5">Standard (1,5)</option>
+                <option value="1.85">Aéré (1,85)</option>
+                <option value="2.2">Large (2,2)</option>
+              </select>
+              <span class="rte-sep"></span>
+              <label class="rte-color"><input type="color" class="rte-color-input" data-color="fore" value="#dc2626"><span>Couleur</span></label>
+              <label class="rte-color"><input type="color" class="rte-color-input" data-color="back" value="#fef3c7"><span>Surligner</span></label>
+              <span class="rte-sep"></span>
+              <button type="button" class="rte-btn" data-action="rte-image" title="Insérer une image">🖼</button>
+              <button type="button" class="rte-btn" data-cmd="clear" title="Effacer la mise en forme">✕</button>
+              <button type="button" class="rte-btn rte-student-preview" data-action="student-preview" title="Voir / éditer tel que vu par l'élève">👁</button>
+            </div>`;
+  }
+
   function fieldHtml(id, label, inputHtml) {
     return `<div class="field"><label for="${id}">${label}</label>${inputHtml}</div>`;
   }
@@ -971,6 +1083,7 @@ $('#row-list').innerHTML = rows.map((r, i) => {
         e.preventDefault();
         const editor = btn.closest('.rte').querySelector('.rte-editor');
         editor.focus();
+        rteRestoreSelection(editor);
         const cmd = btn.dataset.cmd;
         document.execCommand(cmd === 'clear' ? 'removeFormat' : cmd, false, null);
         return;
@@ -991,6 +1104,7 @@ $('#row-list').innerHTML = rows.map((r, i) => {
       if (colorInput) {
         const editor = colorInput.closest('.rte').querySelector('.rte-editor');
         editor.focus();
+        rteRestoreSelection(editor);
         document.execCommand(colorInput.dataset.color === 'fore' ? 'foreColor' : 'hiliteColor', false, colorInput.value);
         return;
       }
@@ -1031,8 +1145,34 @@ $('#row-list').innerHTML = rows.map((r, i) => {
     });
   }
   
+  /* =========================================================
+     SÉLECTION DANS LES ÉDITEURS RICHES
+     Cliquer un bouton ou un menu de la barre d'outils fait sortir
+     le focus de l'éditeur et peut effacer la sélection : on mémorise
+     en continu la dernière sélection vue dans chaque éditeur et on la
+     restitue juste avant d'appliquer un effet.
+     ========================================================= */
+  const rteRanges = new WeakMap();
+  document.addEventListener('selectionchange', () => {
+    const sel = window.getSelection();
+    if (!sel || !sel.rangeCount || !sel.anchorNode) return;
+    const node = sel.anchorNode.nodeType === 1 ? sel.anchorNode : sel.anchorNode.parentElement;
+    if (!node) return;
+    const host = node.closest('.rte-editor');
+    if (host && host.isContentEditable) rteRanges.set(host, sel.getRangeAt(0).cloneRange());
+  });
+
+  function rteRestoreSelection(editor) {
+    const r = rteRanges.get(editor);
+    const sel = window.getSelection();
+    if (!r || !sel) return false;
+    try { sel.removeAllRanges(); sel.addRange(r); } catch (err) { return false; }
+    return true;
+  }
+
   function applyRteSpanStyle(editor, cssProp, cssVal) {
     editor.focus();
+    rteRestoreSelection(editor);
     const sel = window.getSelection();
     if (!sel || !sel.rangeCount) return;
     const range = sel.getRangeAt(0);
@@ -1074,6 +1214,7 @@ $('#row-list').innerHTML = rows.map((r, i) => {
 
 function applyRteLineHeight(editor, lineHeightVal) {
     editor.focus();
+    rteRestoreSelection(editor);
     if (!lineHeightVal) {
       editor.style.lineHeight = '';
       editor.querySelectorAll('p, div, li, blockquote').forEach((node) => {
@@ -1177,17 +1318,18 @@ function openStudentTextPreview(rteEl) {
     reader.readAsDataURL(file);
   }
 
-  function collectModuleValue(moduleId) {
-    const m = allMods().find((x) => x.id === moduleId);
-    if (!m) return null;
-    const type = App.schema.Types[m.kind];
+  /* Lit les champs d'un type de contenu dans la page en cours ; keyBase
+     distingue les occurrences (une cellule par module, ou par ligne pour
+     les contenus d'information). */
+  function collectFields(kind, keyBase) {
+    const type = App.schema.Types[kind];
     const fields = type.formSchema(type.createEmpty());
     const collected = {};
     fields.forEach((f) => {
-      const id = 'f_' + moduleId + '_' + f.name;
+      const id = 'f_' + keyBase + '_' + f.name;
       if (f.type === 'richtext') {
         const editor = document.querySelector(
-          '[data-rte-module="' + moduleId + '"][data-rte-field="' + f.name + '"] .rte-editor');
+          '[data-rte-module="' + keyBase + '"][data-rte-field="' + f.name + '"] .rte-editor');
         const raw = editor ? editor.innerHTML : '';
         const withRefs = App.utils.htmlWithMediaRefs
           ? App.utils.htmlWithMediaRefs(raw) : raw;
@@ -1197,12 +1339,18 @@ function openStudentTextPreview(rteEl) {
         collected[f.name] = el ? el.value : '';
       }
     });
-    return App.schema.buildPayload(m.kind, collected);
+    return collected;
+  }
+
+  function collectModuleValue(moduleId) {
+    const m = allMods().find((x) => x.id === moduleId);
+    if (!m) return null;
+    return App.schema.buildPayload(m.kind, collectFields(m.kind, m.id));
   }
 
   function onSubmitRow(e) {
     e.preventDefault();
-    const mods = allMods();
+    const mods = allMods().filter((m) => m.role === 'associate');
     const cells = {};
     for (const m of mods) {
       cells[m.id] = collectModuleValue(m.id);
