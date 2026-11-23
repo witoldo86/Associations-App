@@ -1172,3 +1172,27 @@ body.student-mode .row.row-multiline{ grid-template-columns:2rem minmax(0,1fr); 
 .mq-act{ font-size:.85rem; }
 .mq-mini-pools{ gap:.35rem; }
 .mq-mrow{ gap:.35rem; }
+
+/* =========================================================
+   CADRE « STYLE GÉNÉRAL » AU-DESSUS DE LA MAQUETTE
+   ========================================================= */
+.mq-stylebar{
+  display:flex; flex-wrap:wrap; gap:.75rem; align-items:flex-end;
+  border:1px solid var(--line); border-radius:10px; background:#fff;
+  padding:.6rem .8rem; margin-bottom:.75rem;
+}
+.mq-stylebar .field{ margin:0; }
+.mq-stylebar-title{ font-weight:600; font-size:.85rem; align-self:center; margin-right:.25rem; }
+.mq-stylebar input[type="color"]{ width:2.2rem; height:1.8rem; padding:0; }
+
+/* =========================================================
+   RÉSERVES ÉLÈVE : images compactes et miniatures complètes
+   ========================================================= */
+.pool > .item-image{ flex:0 1 auto; }
+body.student-mode .pool .item-image img{ object-fit:contain; background:#fff; }
+body.student-mode #s-pools-zone .pool-col.is-expanded .item-image{
+  width:auto; max-width:100%; height:auto; padding:.35rem;
+}
+body.student-mode #s-pools-zone .pool-col.is-expanded .item-image img{
+  width:auto; max-width:100%; max-height:170px;
+}

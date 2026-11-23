@@ -77,44 +77,11 @@
   const options = (table) => Object.keys(table).map((k) =>
     '<option value="' + k + '">' + esc(table[k].label) + '</option>').join('');
 
-  const gridOptions = () => '<option value="0">Tous sur une ligne (défaut)</option>' +
-    [1, 2, 3, 4].map((n) => '<option value="' + n + '">' + n + ' par ligne</option>').join('');
 
-  function controlsHtml() {
+  function styleBarHtml() {
     return `
-      <fieldset class="mq-group">
-        <legend>Grille des modules</legend>
-        <div class="field"><label for="mq-boardcols">Plateau : modules par ligne</label>
-          <select id="mq-boardcols" data-mq="boardCols">${gridOptions()}</select></div>
-        <div class="field"><label for="mq-poolscols">Réserves : modules par ligne</label>
-          <select id="mq-poolscols" data-mq="poolsCols">${gridOptions()}</select></div>
-        <p class="hint">Le <strong>plateau</strong> est la zone où l'élève dépose ses réponses (colonnes
-          à associer) ; les <strong>réserves</strong> sont les bacs d'où il pioche les éléments.
-          Dans les deux, tant que les modules tiennent sur une ligne, les largeurs se règlent
-          à la main dans l'aperçu (séparateurs bleus) ; au-delà, la grille impose des colonnes égales.</p>
-      </fieldset>
-
-      <fieldset class="mq-group">
-        <legend>Textes de l'écran</legend>
-        <div class="field"><label for="mq-title">Titre</label>
-          <input id="mq-title" type="text" data-mq="title"></div>
-        <div class="field"><label for="mq-subtitle">Consigne</label>
-          <input id="mq-subtitle" type="text" data-mq="subtitle"></div>
-        <div class="inline">
-          <div class="field"><label for="mq-titlesize">Taille du titre</label>
-            <select id="mq-titlesize" data-mq="theme.titleSize">${options(T.TITLE_SIZES)}</select></div>
-          <div class="field field-auto"><label for="mq-titlecolor">Couleur du titre</label>
-            <span class="inline">
-              <input id="mq-titlecolor" type="color" data-mq="theme.titleColor">
-              <button type="button" class="btn link" data-mq-reset="titleColor">Auto</button>
-            </span></div>
-        </div>
-        <div class="field"><label for="mq-subsize">Taille de la consigne</label>
-          <select id="mq-subsize" data-mq="theme.subtitleSize">${options(T.SUBTITLE_SIZES)}</select></div>
-      </fieldset>
-
-      <fieldset class="mq-group">
-        <legend>Couleurs</legend>
+      <div class="mq-stylebar">
+        <span class="mq-stylebar-title">Style général</span>
         <div class="inline inline-colors">
           <div class="field field-auto"><label for="mq-primary">Principale</label>
             <input id="mq-primary" type="color" data-mq="theme.primary"></div>
@@ -123,19 +90,13 @@
           <div class="field field-auto"><label for="mq-ink">Texte</label>
             <input id="mq-ink" type="color" data-mq="theme.ink"></div>
         </div>
-      </fieldset>
-
-      <fieldset class="mq-group">
-        <legend>Style général</legend>
         <div class="field"><label for="mq-font">Police</label>
           <select id="mq-font" data-mq="theme.font">${options(T.FONTS)}</select></div>
-        <div class="inline">
-          <div class="field"><label for="mq-scale">Taille du texte</label>
-            <select id="mq-scale" data-mq="theme.scale">${options(T.SCALES)}</select></div>
-          <div class="field"><label for="mq-radius">Coins</label>
-            <select id="mq-radius" data-mq="theme.radius">${options(T.RADII)}</select></div>
-        </div>
-      </fieldset>`;
+        <div class="field"><label for="mq-scale">Taille du texte</label>
+          <select id="mq-scale" data-mq="theme.scale">${options(T.SCALES)}</select></div>
+        <div class="field"><label for="mq-radius">Coins</label>
+          <select id="mq-radius" data-mq="theme.radius">${options(T.RADII)}</select></div>
+      </div>`;
   }
 
   M.mount = function (container) {
@@ -152,14 +113,14 @@
         Tout se pilote ici : glissez les modules pour les déplacer ou les réordonner,
         ajoutez-en avec le bouton <strong>＋</strong> de chaque zone, éditez/visualisez/supprimez
         avec <strong>✎ 📄 🗑</strong> au survol des blocs, modifiez le titre, la consigne
-        et la grille avec les boutons <strong>✎</strong> et <strong>⌗</strong> de l'aperçu. Chaque réglage est
+        et la grille avec les boutons <strong>✎</strong> et <strong>⌗</strong> de l'aperçu. Les couleurs, la police,
+        la taille du texte et les coins se règlent dans le cadre « Style général » au-dessus.
+        Chaque réglage est
         <strong>enregistré automatiquement</strong> (indicateur en haut à droite) et aussitôt
         visible dans les espaces élève et prof.
       </p>
-      <div class="mq-layout">
-        <div class="mq-preview-col" id="mq-preview"></div>
-        <div class="mq-controls">${controlsHtml()}</div>
-      </div>`;
+      ${styleBarHtml()}
+      <div class="mq-preview-col" id="mq-preview"></div>`;
 
     draft = fromState();
     syncControls();

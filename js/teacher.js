@@ -72,7 +72,7 @@
                 esc(t.titleColor || t.ink || '#1f2937') + '">' +
                 '<button type="button" class="btn link" id="tx-color-auto">Auto</button></span></div>'
               : '') +
-            '<div class="field"><label for="tx-font">Police de l’exercice</label>' +
+            '<div class="field"><label for="tx-font">Police (tout l’exercice — titre, consigne, contenus)</label>' +
               '<select id="tx-font">' + fontOpts + '</select></div>' +
           '</div>' +
           '<div class="form-actions">' +
