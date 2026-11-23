@@ -646,6 +646,7 @@ function refreshDropDisplay(moduleId, rowIndex, previousRow) {
     const el = root.querySelector('[data-item-key="' + cssId(key) + '"]');
     const run = () => {
       if (type && type.open) type.open(item.value);
+      injectModalNav(item.moduleId, key);
       // Le rendu n'est refait que si cette ouverture peut changer un verrou
       if (isNew && assocMods().some((m) => m.unlockAfter && m.unlockAfter.includes(item.moduleId))) {
         render();
@@ -658,6 +659,53 @@ function refreshDropDisplay(moduleId, rowIndex, previousRow) {
     } else {
       run();
     }
+  }
+
+  /* =========================================================
+     NAVIGATION ‹ › ENTRE LES ÉLÉMENTS D'UN MÊME BAC
+     Injectée dans la fenêtre de visualisation (image, son, vidéo,
+     page web, cartel…) ouverte au clic sur un élément du pool.
+     ========================================================= */
+  function injectModalNav(moduleId, currentKey) {
+    const keys = board.keys[moduleId] || [];
+    if (keys.length < 2) return;
+    const box = document.querySelector('#modal-root .modal-image, #modal-root .modal');
+    if (!box) return;
+    if (getComputedStyle(box).position === 'static') box.style.position = 'relative';
+    const i = keys.indexOf(currentKey);
+    const state = { keys, i };
+    const style = 'position:absolute;top:50%;transform:translateY(-50%);width:40px;height:64px;' +
+      'font-size:2.6rem;line-height:1;border:none;background:transparent;color:#64748b;' +
+      'opacity:.4;cursor:pointer;z-index:20;';
+    const mkBtn = (dir) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'modal-nav';
+      b.dataset.itemNav = dir;
+      b.textContent = dir === 'prev' ? '‹' : '›';
+      b.setAttribute('aria-label', dir === 'prev' ? 'Élément précédent' : 'Élément suivant');
+      b.title = b.getAttribute('aria-label');
+      b.style.cssText = style + (dir === 'prev' ? 'left:.35rem' : 'right:.35rem');
+      return b;
+    };
+    box.appendChild(mkBtn('prev'));
+    box.appendChild(mkBtn('next'));
+    box.querySelectorAll('.modal-nav').forEach((b) => {
+      b.addEventListener('click', () => {
+        const n = state.keys.length;
+        state.i = ((state.i + (b.dataset.itemNav === 'prev' ? -1 : 1)) % n + n) % n;
+        const k = state.keys[state.i];
+        const item = board.items[k];
+        const set = viewed[moduleId];
+        const isNew = !!set && !set.has(k);
+        if (set) set.add(k);
+        App.schema.Types[item.kind].open(item.value);
+        setTimeout(() => injectModalNav(moduleId, k), 0);
+        if (isNew && assocMods().some((m) => m.unlockAfter && m.unlockAfter.includes(moduleId))) {
+          render();
+        }
+      });
+    });
   }
 
   /* =========================================================

@@ -1254,3 +1254,10 @@ body.student-mode #s-pools-zone .pool-col.is-expanded .item-image img{
 @media(prefers-reduced-motion:reduce){
   .module-nav{ transition:none; }
 }
+
+/* =========================================================
+   NAVIGATION ‹ › DANS LA FENÊTRE DE VISUALISATION D'UN ÉLÉMENT
+   Le style de base est embarqué dans le HTML (js/student.js) ;
+   ici : le survol (durcissement) et rien d'autre.
+   ========================================================= */
+.modal-nav:hover{ opacity:1 !important; color:var(--primary) !important; }
