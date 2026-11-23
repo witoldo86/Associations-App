@@ -26,7 +26,8 @@
       const title = App.utils.escapeHtml(opts.title || '');
       this.root.innerHTML =
         '<div class="modal-backdrop">' +
-          '<div class="modal" role="dialog" aria-modal="true">' +
+          '<div class="modal' + (opts.wide === true ? ' modal-wide' : '') +
+          '" role="dialog" aria-modal="true">' +
             '<div class="modal-head">' +
               '<h3>' + title + '</h3>' +
               '<button type="button" class="modal-close" data-close aria-label="Fermer">✕</button>' +
