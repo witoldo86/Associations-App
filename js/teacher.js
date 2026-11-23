@@ -10,6 +10,10 @@
   let editingModuleId = null;
   let editingCellCtx = null;
   let flattenedRowIds = new Set();
+  let rowsView = (() => {
+    try { return localStorage.getItem('assoc3-rows-view') === 'compact' ? 'compact' : 'modules'; }
+    catch (e) { return 'modules'; }
+  })();
 
   const $ = (sel) => root.querySelector(sel);
   const $$ = (sel) => [...root.querySelectorAll(sel)];
@@ -131,6 +135,13 @@
     if (focusEl) focusEl.focus();
   }
 
+  /* Position des panneaux d'information : plateau (défaut), réserves,
+     ou pleine hauteur (les deux) — les anciens réglages sont convertis. */
+  function asideModeLocal(l) {
+    if (l && l.infosAside) return String(l.infosAside);
+    return (l && l.infosBesidePools) ? 'pools' : 'board';
+  }
+
   function openGridDialog() {
     const l = cfg().layout || {};
     const opts = (cur) => '<option value="0"' + (!cur ? ' selected' : '') +
@@ -147,8 +158,9 @@
             '<select id="gd-pools">' + opts(gridNLocal(l.poolsCols)) + '</select></div>' +
           '<div class="field"><label for="gd-infos">Panneaux d\'information (gauche / droite)</label>' +
             '<select id="gd-infos">' +
-              '<option value="board"' + (!l.infosBesidePools ? ' selected' : '') + '>À gauche et à droite du plateau (défaut)</option>' +
-              '<option value="pools"' + (l.infosBesidePools ? ' selected' : '') + '>À gauche et à droite des réserves</option>' +
+              '<option value="board"' + (asideModeLocal(l) === 'board' ? ' selected' : '') + '>À gauche et à droite du plateau (défaut)</option>' +
+              '<option value="pools"' + (asideModeLocal(l) === 'pools' ? ' selected' : '') + '>À gauche et à droite des réserves</option>' +
+              '<option value="both"' + (asideModeLocal(l) === 'both' ? ' selected' : '') + '>Pleine hauteur — à côté des réserves et du plateau</option>' +
             '</select></div>' +
           '<p class="hint">Le <strong>plateau</strong> est la zone où l’élève dépose ses réponses ; ' +
             'les <strong>réserves</strong> sont les bacs d’où il pioche les éléments. ' +
@@ -164,6 +176,7 @@
       c2.layout = Object.assign({}, c2.layout, {
         boardCols: gridNLocal(document.getElementById('gd-board').value),
         poolsCols: gridNLocal(document.getElementById('gd-pools').value),
+        infosAside: document.getElementById('gd-infos').value,
         infosBesidePools: document.getElementById('gd-infos').value === 'pools'
       });
       App.state.updateConfig(c2);
@@ -633,6 +646,10 @@ function panelRows() {
                   aria-label="Plier ou déplier toutes les lignes">⊟ Tout plier</button>
         </div>
         <div class="tools">
+          <div class="inline" role="group" aria-label="Vue des lignes" style="gap:.25rem;margin-right:.6rem">
+            <button type="button" class="btn small" data-rows-view="compact" title="Vue synthétique : lignes compactes, comme l'ancienne présentation">Vue synthétique</button>
+            <button type="button" class="btn small" data-rows-view="modules" title="Vue en modules : cellules détaillées, une boîte par module">Vue modules</button>
+          </div>
           <button type="button" class="btn primary" id="row-add">+ Nouvelle ligne</button>
         </div>
       </div>
@@ -670,10 +687,25 @@ function onToggleFlattenAll() {
     if (selectedRowId && !rows.some((r) => String(r.id) === String(selectedRowId))) {
       selectedRowId = null;
     }
-$('#row-list').innerHTML = rows.map((r, i) => {
+    const list = $('#row-list');
+    list.classList.toggle('rows-compact', rowsView === 'compact');
+    [...document.querySelectorAll('[data-rows-view]')].forEach((b) => {
+      const active = b.dataset.rowsView === rowsView;
+      b.classList.toggle('primary', active);
+      b.setAttribute('aria-pressed', active ? 'true' : 'false');
+    });
+    const renderer = rowsView === 'compact' ? rowCompactHtml : rowModulesHtml;
+    list.innerHTML = rows.map(renderer).join('');
+  }
+
+  /* Vue des lignes : « modules » (détaillée) ou « synthétique » (compacte,
+     inspirée de l'ancienne présentation : vignette + résumé court). */
+  function rowModulesHtml(r, i) {
+      const mods = allMods().filter((m) => m.role === 'associate');
       const cellsHtml = mods.map((m) => cellPreviewHtml(m, r.cells[m.id])).join('');
       const isSel = String(r.id) === String(selectedRowId);
       const isFlat = flattenedRowIds.has(String(r.id));
+      const total = App.state.rows().length;
       return `
         <li class="triplet-item${isSel?' selected':''}${isFlat?' is-flattened':''}" data-row-id="${esc(r.id)}">
           <div class="triplet-body">
@@ -685,7 +717,7 @@ $('#row-list').innerHTML = rows.map((r, i) => {
               <button type="button" class="btn small" data-row-act="up" title="Monter"
                       aria-label="Monter cette ligne" ${i===0?'disabled':''}>↑</button>
               <button type="button" class="btn small" data-row-act="down" title="Descendre"
-                      aria-label="Descendre cette ligne" ${i===rows.length-1?'disabled':''}>↓</button>
+                      aria-label="Descendre cette ligne" ${i===total-1?'disabled':''}>↓</button>
               <button type="button" class="btn small primary" data-row-act="edit" title="Modifier"
                       aria-label="Modifier cette ligne">✎</button>
               <button type="button" class="btn small danger" data-row-act="del" title="Supprimer"
@@ -694,7 +726,55 @@ $('#row-list').innerHTML = rows.map((r, i) => {
             <div class="row-cells">${cellsHtml || '<em class="muted">vide</em>'}</div>
           </div>
         </li>`;
-    }).join('');
+  }
+
+  /* Ligne compacte (vue synthétique) : une vignette par module, sans boîte
+     détaillée — image en vignette, texte en gras, même clic pour éditer. */
+  function rowCompactHtml(r, i) {
+    const mods = allMods().filter((m) => m.role === 'associate');
+    const cellsHtml = mods.map((m) => compactCellHtml(m, r.cells[m.id])).join('');
+    const isSel = String(r.id) === String(selectedRowId);
+    const total = App.state.rows().length;
+    return `
+      <li class="triplet-item${isSel ? ' selected' : ''}" data-row-id="${esc(r.id)}">
+        <div class="triplet-body">
+          <div class="row-tools">
+            <button type="button" class="btn small" data-row-act="up" title="Monter"
+                    aria-label="Monter cette ligne" ${i === 0 ? 'disabled' : ''}>↑</button>
+            <button type="button" class="btn small" data-row-act="down" title="Descendre"
+                    aria-label="Descendre cette ligne" ${i === total-1 ? 'disabled' : ''}>↓</button>
+            <button type="button" class="btn small" data-row-act="edit" title="Modifier"
+                    aria-label="Modifier cette ligne">✎</button>
+            <button type="button" class="btn small danger" data-row-act="del" title="Supprimer"
+                    aria-label="Supprimer cette ligne">🗑</button>
+          </div>
+          <div class="row-cells compact">${cellsHtml || '<em class="muted">ligne vide</em>'}</div>
+        </div>
+      </li>`;
+  }
+
+  function compactCellHtml(m, v) {
+    const type = App.schema.Types[m.kind];
+    const valid = Boolean(v != null && type && (!type.validate || type.validate(v)));
+    const modAttr = ` data-module-id="${esc(m.id)}" title="${valid ? 'Modifier' : 'Ajouter'} ${esc(m.label || m.id)}"`;
+    if (!valid) return `<div class="syn-cell empty"${modAttr}><span class="syn-missing">—</span><span class="syn-name">${esc(m.label || m.id)}</span></div>`;
+    if (m.kind === 'image') {
+      return `<div class="syn-cell image"${modAttr}>` +
+        `<span class="syn-thumb"><img src="${esc(resolveSrc(v && v.src))}" alt="" loading="lazy" decoding="async"></span>` +
+        `<span class="syn-name">${esc(m.label || m.id)}</span></div>`;
+    }
+    let main = '';
+    if (m.kind === 'text') main = esc(String(v).trim());
+    else if (m.kind === 'richtext') {
+      const title = v && v.title ? String(v.title).trim() : '';
+      const txt = App.utils.stripHtml((v && v.html) || '');
+      main = esc(title || txt.slice(0, 60) || '(texte)');
+    } else {
+      const cap = (v && (v.caption || v.src)) || '';
+      const icon = m.kind === 'audio' ? '🔊' : (m.kind === 'video' ? '🎬' : '🌐');
+      main = icon + ' ' + esc(String(cap || '').slice(0, 60));
+    }
+    return `<div class="syn-cell"${modAttr}><span class="syn-text">${main}</span><span class="syn-name">${esc(m.label || m.id)}</span></div>`;
   }
 
   /* Vignette d'aperçu d'une cellule (module × ligne) */
@@ -1039,6 +1119,10 @@ $('#row-list').innerHTML = rows.map((r, i) => {
               <button type="button" class="rte-btn" data-cmd="bold" title="Gras"><b>G</b></button>
               <button type="button" class="rte-btn" data-cmd="italic" title="Italique"><i>I</i></button>
               <button type="button" class="rte-btn" data-cmd="underline" title="Souligné"><u>S</u></button>
+              <span class="rte-sep"></span>
+              <button type="button" class="rte-btn" data-cmd="justifyLeft" title="Aligner à gauche" aria-label="Aligner à gauche">◧</button>
+              <button type="button" class="rte-btn" data-cmd="justifyCenter" title="Centrer" aria-label="Centrer">▣</button>
+              <button type="button" class="rte-btn" data-cmd="justifyRight" title="Aligner à droite" aria-label="Aligner à droite">◨</button>
               <span class="rte-sep"></span>
               <select class="rte-select rte-font" title="Police d'écriture" aria-label="Police d'écriture">
                 <option value="">Police par défaut</option>
@@ -1430,7 +1514,7 @@ function openStudentTextPreview(rteEl) {
       return;
     }
 
-    const cellBox = e.target.closest('.cell-box[data-module-id]');
+    const cellBox = e.target.closest('.cell-box[data-module-id], .syn-cell[data-module-id]');
     if (cellBox) {
       const li = cellBox.closest('li[data-row-id]');
       if (li) {
@@ -1449,7 +1533,7 @@ function openStudentTextPreview(rteEl) {
 
   function onRowListDblClick(e) {
     if (e.target.closest('button[data-row-act]')) return;
-    if (e.target.closest('.cell-box[data-module-id]')) return;
+    if (e.target.closest('.cell-box[data-module-id], .syn-cell[data-module-id]')) return;
     const li = e.target.closest('li[data-row-id]');
     if (!li) return;
     startEditRow(li.dataset.rowId);
@@ -1586,6 +1670,14 @@ function openStudentTextPreview(rteEl) {
     $('#cfg-save').addEventListener('click', saveConfig);
     $('#row-add').addEventListener('click', startAddRow);
     $('#rows-toggle-flatten').addEventListener('click', onToggleFlattenAll);
+    root.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-rows-view]');
+      if (!b || rowsView === b.dataset.rowsView) return;
+      rowsView = b.dataset.rowsView;
+      try { localStorage.setItem('assoc3-rows-view', rowsView); } catch (err) {}
+      selectedRowId = null;
+      renderRows();
+    });
     $('#row-list').addEventListener('click', onRowListClick);
     $('#row-list').addEventListener('dblclick', onRowListDblClick);
 

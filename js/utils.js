@@ -42,7 +42,7 @@
   const SAFE_SRC_RE = /^(https?:\/\/|data:image\/|media:)/i;
   const DROP_TAGS = new Set(['SCRIPT', 'STYLE', 'IFRAME', 'OBJECT', 'EMBED', 'NOSCRIPT', 'TEMPLATE', 'SVG', 'MATH']);
   const ALLOWED_STYLES = ['color', 'background-color', 'font-weight', 'font-style',
-    'text-decoration', 'font-family', 'font-size', 'line-height'];
+    'text-decoration', 'font-family', 'font-size', 'line-height', 'text-align'];
 
   function cleanNode(node) {
     [...node.childNodes].forEach((child) => {
