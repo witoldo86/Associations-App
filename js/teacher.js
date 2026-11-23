@@ -386,6 +386,13 @@
         </label>
       </div>
       ${revealBlock}
+      <div class="field" id="mf-pooltitle-row">
+          <label class="inline" style="gap:.45rem">
+            <input id="mf-pooltitle" type="checkbox" ${m && m.kind === 'richtext' && m.poolTitleOnly ? 'checked' : ''}>
+            N'afficher que le titre dans les réserves de l'élève — pour un module
+            de texte enrichi (un clic sur le titre ouvre le contenu)
+          </label>
+        </div>
       ${isInfo ? `<div class="field">
           <label>Affichage du panneau d'information</label>
           <select id="mf-infomode">
@@ -477,8 +484,10 @@
     const clickableEl = document.getElementById('mf-clickable');
     const revealChecked = [...document.querySelectorAll('input[data-reveal-row]:checked')]
       .map((x) => x.dataset.revealRow);
+    const poolTitleEl = document.getElementById('mf-pooltitle');
     const payload = { id, label, kind, role, unlockAfter,
       poolCols: poolColsRaw ? Number(poolColsRaw) : null,
+      poolTitleOnly: kind === 'richtext' && !!(poolTitleEl && poolTitleEl.checked),
       clickable: !!(clickableEl && clickableEl.checked),
       /* Panneau informatif visible dès qu'une des lignes cochées est
          complétée (ou des éléments consultés, via le verrou) ; liste

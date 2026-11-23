@@ -268,7 +268,9 @@
 
   const itemHtml = (key) => {
     const item = board.items[key];
-    return App.schema.Types[item.kind].render(item.value, { key, module: item.moduleId });
+    const mod = cfg().modules.find((x) => String(x.id) === String(item.moduleId));
+    return App.schema.Types[item.kind].render(item.value,
+      { key, module: item.moduleId, titleOnly: !!(mod && mod.poolTitleOnly) });
   };
 
   /* Signature d'une valeur : pour dédupliquer la réserve. Quand le prof a
@@ -439,13 +441,13 @@
         ? '<audio controls src="' + esc(App.media.resolve(v.src)) + '" style="width:100%"></audio>'
         : m.kind === 'video'
           ? '<video controls src="' + esc(App.media.resolve(v.src)) + '" style="width:100%;max-height:60vh"></video>'
-          : '<iframe src="' + esc(v.src) + '" style="width:100%;height:60vh;border:0" sandbox="allow-scripts allow-same-origin"></iframe>') +
+          : '<iframe class="modal-web-frame" src="' + esc(v.src) + '" sandbox="allow-scripts allow-same-origin"></iframe>') +
         (v.html ? '<div class="modal-rich" style="margin-top:.75rem">' + App.utils.resolveMediaInHtml(v.html) + '</div>' : '');
     } else if (typeof type.open === 'function') {
       type.open(v);
       return;
     }
-    App.modal.open({ title: modLabel(m), html: body || '<p>—</p>' });
+    App.modal.open({ title: modLabel(m), html: body || '<p>—</p>', wide: m.kind === 'url' });
   }
 
   /* =========================================================

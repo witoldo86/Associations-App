@@ -124,15 +124,15 @@
       open: (v) => {
         if (!v) return;
         const page = v.src
-          ? '<iframe src="' + esc(v.src) + '" style="width:100%;height:60vh;border:0" ' +
+          ? '<iframe class="modal-web-frame" src="' + esc(v.src) + '" ' +
             'sandbox="allow-scripts allow-same-origin"></iframe>' +
-            '<p style="margin:.5rem 0 0"><a href="' + esc(v.src) + '" target="_blank" rel="noopener">Ouvrir dans un nouvel onglet</a></p>'
+            '<p class="modal-web-link"><a href="' + esc(v.src) + '" target="_blank" rel="noopener">Ouvrir dans un nouvel onglet</a></p>'
           : '';
         const rich = v.html
           ? '<div class="modal-rich" style="margin-top:.75rem">' + App.utils.resolveMediaInHtml(v.html) + '</div>'
           : '';
         if (!page && !rich) return;
-        App.modal.open({ title: (v && v.caption) || 'Page web', html: page + rich });
+        App.modal.open({ title: (v && v.caption) || 'Page web', html: page + rich, wide: true });
       }
     },
 
@@ -147,12 +147,20 @@
         { name:'html',  type:'richtext', label:'Contenu',            value:(v&&v.html)||'' }
       ],
       build: (f) => ({ title: f.title || '', html: App.utils.sanitizeRich(f.html || '') }),
-      render: (v, ctx) =>
-        '<div class="item item-info" data-item-key="' + esc(ctx.key) +
-        '" data-item-type="richtext">' +
-        (v && v.title ? '<strong>' + esc(v.title) + '</strong>' : '') +
-        '<div class="rich clamp">' + ((v && v.html) ? App.utils.resolveMediaInHtml(v.html) : '') + '</div>' +
-        '</div>',
+      render: (v, ctx) => {
+        if (ctx && ctx.titleOnly) {
+          const t = (v && v.title && String(v.title).trim()) ||
+            App.utils.stripHtml((v && v.html) || '').slice(0, 60) || 'Texte';
+          return '<div class="item item-info item-title-only" data-item-key="' + esc(ctx.key) +
+            '" data-item-type="richtext" title="Cliquez pour lire">' +
+            '<strong>' + esc(t) + '</strong><span class="item-title-hint">\u25b8 lire</span></div>';
+        }
+        return '<div class="item item-info" data-item-key="' + esc(ctx.key) +
+          '" data-item-type="richtext">' +
+          (v && v.title ? '<strong>' + esc(v.title) + '</strong>' : '') +
+          '<div class="rich clamp">' + ((v && v.html) ? App.utils.resolveMediaInHtml(v.html) : '') + '</div>' +
+          '</div>';
+      },
       open: (v) => App.modal.open({
         title: (v && v.title) || 'Cartel',
         html: '<div class="modal-rich">' + ((v && v.html) ? App.utils.resolveMediaInHtml(v.html) : '') + '</div>'
