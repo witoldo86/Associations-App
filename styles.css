@@ -1261,3 +1261,43 @@ body.student-mode #s-pools-zone .pool-col.is-expanded .item-image img{
    ici : le survol (durcissement) et rien d'autre.
    ========================================================= */
 .modal-nav:hover{ opacity:1 !important; color:var(--primary) !important; }
+
+/* =========================================================
+   TEXTES ENRICHIS AVEC IMAGES (cartels, sons, vidéos, pages web)
+   ========================================================= */
+.modal-rich img, .student-preview-surface img{
+  max-width:100%; height:auto; display:block;
+  border:1px solid var(--line); border-radius:6px; margin:.4rem 0;
+}
+.rte-editor img{
+  max-width:min(260px,100%); height:auto; display:block;
+  border:1px solid var(--line); border-radius:6px; margin:.3rem 0;
+}
+.modal-info-text{ font-size:1.08rem; line-height:1.65; margin:0; }
+
+/* =========================================================
+   MODULES D'INFO CLIQUABLES (côté élève)
+   ========================================================= */
+.info-item-clickable{
+  cursor:pointer; border-radius:6px; outline:none;
+  transition:box-shadow .15s, transform .15s;
+}
+.info-item-clickable:hover{
+  box-shadow:0 0 0 2px var(--primary, #6366f1);
+  transform:translateY(-1px);
+}
+.info-item-clickable:focus-visible{
+  box-shadow:0 0 0 2px var(--primary, #6366f1);
+}
+
+/* =========================================================
+   COPIE D'UNE CELLULE VERS D'AUTRES LIGNES (espace prof)
+   ========================================================= */
+.cell-box{ position:relative; }
+.cell-copy{
+  position:absolute; top:-1px; right:-1px;
+  padding:.1rem .45rem; font-size:.85rem; line-height:1.4;
+  border:1px solid var(--line); border-radius:0 8px 0 8px;
+  background:#fff; color:#475569;
+}
+.cell-copy:hover{ background:#eef2ff; color:var(--primary, #6366f1); }

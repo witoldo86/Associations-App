@@ -94,6 +94,15 @@
     root.addEventListener('click', onModuleExpandClick);
     $('#s-reset').addEventListener('click', () => S.reset());
     $('#s-save').addEventListener('click', onSave);
+    root.addEventListener('click', (e) => {
+      const el = e.target.closest('.info-item-clickable');
+      if (el) openInfoModal(el.dataset.infoModule, el.dataset.infoRow);
+    });
+    root.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      const el = e.target.closest ? e.target.closest('.info-item-clickable') : null;
+      if (el) { e.preventDefault(); openInfoModal(el.dataset.infoModule, el.dataset.infoRow); }
+    });
 
     // L'écouteur est sur document : root n'a jamais le focus clavier
     document.addEventListener('keydown', (e) => {
@@ -225,8 +234,19 @@
     return App.schema.Types[item.kind].render(item.value, { key, module: item.moduleId });
   };
 
+  /* Signature d'une valeur : pour dédupliquer la réserve. Quand le prof a
+     copié un contenu sur plusieurs lignes, un seul exemplaire s'affiche ;
+     il ne disparaît qu'une fois la dernière copie déposée. */
+  const sigOf = (v) => JSON.stringify(v == null ? null : v);
+
   function poolHtml(moduleId) {
-    return board.keys[moduleId].filter((k) => board.placement[k] === null).map(itemHtml).join('');
+    const unplaced = board.keys[moduleId].filter((k) => board.placement[k] === null);
+    const reps = new Map();
+    unplaced.forEach((k) => {
+      const s = sigOf(board.items[k].value);
+      if (!reps.has(s)) reps.set(s, k);
+    });
+    return [...reps.values()].map(itemHtml).join('');
   }
 
   function render() {
@@ -299,7 +319,13 @@
         if (!type) return '';
         const items = rows
           .filter((r) => r.cells[m.id] != null && type.validate(r.cells[m.id]))
-          .map((r) => type.render(r.cells[m.id], { key: 'info_' + m.id + '_' + r.id, static: true }));
+          .map((r) => {
+            const rendered = type.render(r.cells[m.id], { key: 'info_' + m.id + '_' + r.id, static: true });
+            if (!m.clickable) return rendered;
+            return '<div class="info-item-clickable" data-info-module="' + esc(m.id) +
+              '" data-info-row="' + esc(r.id) + '" role="button" tabindex="0" ' +
+              'title="Afficher en grand">' + rendered + '</div>';
+          });
         return items.length
           ? '<div class="info-module"><h4>' + esc(modLabel(m)) + '</h4>' + items.join('') + '</div>'
           : '';
@@ -311,6 +337,40 @@
 
   function updateSaveButton() {
     $('#s-save').disabled = !(board && board.total > 0 && board.placed === board.total);
+  }
+
+  /* Module d'information cliquable : fenêtre adaptée au contenu
+     (texte agrandi, image agrandie, média lisible… ). */
+  function openInfoModal(moduleId, rowId) {
+    const m = infoMods().find((x) => String(x.id) === String(moduleId));
+    const row = App.state.rows().find((x) => String(x.id) === String(rowId));
+    if (!m || !row) return;
+    const v = row.cells[m.id];
+    const type = App.schema.Types[m.kind];
+    if (!type || !v || (type.validate && !type.validate(v))) return;
+
+    if (m.kind === 'image') {
+      App.modal.openImage(App.media.resolve(v.src), v.caption || modLabel(m));
+      return;
+    }
+
+    let body = '';
+    if (m.kind === 'richtext') {
+      body = '<div class="modal-rich">' + App.utils.resolveMediaInHtml(v.html || '') + '</div>';
+    } else if (m.kind === 'text') {
+      body = '<p class="modal-info-text">' + esc(v) + '</p>';
+    } else if (m.kind === 'audio' || m.kind === 'video' || m.kind === 'url') {
+      body = (m.kind === 'audio'
+        ? '<audio controls src="' + esc(App.media.resolve(v.src)) + '" style="width:100%"></audio>'
+        : m.kind === 'video'
+          ? '<video controls src="' + esc(App.media.resolve(v.src)) + '" style="width:100%;max-height:60vh"></video>'
+          : '<iframe src="' + esc(v.src) + '" style="width:100%;height:60vh;border:0" sandbox="allow-scripts allow-same-origin"></iframe>') +
+        (v.html ? '<div class="modal-rich" style="margin-top:.75rem">' + App.utils.resolveMediaInHtml(v.html) + '</div>' : '');
+    } else if (typeof type.open === 'function') {
+      type.open(v);
+      return;
+    }
+    App.modal.open({ title: modLabel(m), html: body || '<p>—</p>' });
   }
 
   /* =========================================================
@@ -636,12 +696,24 @@ function refreshDropDisplay(moduleId, rowIndex, previousRow) {
   /* =========================================================
      OUVERTURE DES ÉLÉMENTS (simple clic)
      ========================================================= */
+  /* Fait comme « vu » tous les jumeaux (contenus identiques) d'un élément :
+     utile quand le prof a copié le même contenu sur plusieurs lignes —
+     sinon les verrous « à ouvrir avant » ne pourraient jamais sauter. */
+  function markViewedTwin(moduleId, key) {
+    const set = viewed[moduleId];
+    if (!set) return;
+    const s = sigOf(board.items[key] ? board.items[key].value : null);
+    (board.keys[moduleId] || []).forEach((k) => {
+      if (board.items[k] && sigOf(board.items[k].value) === s) set.add(k);
+    });
+  }
+
   function openItem(key) {
     const item = board.items[key];
     const type = App.schema.Types[item.kind];
     const set = viewed[item.moduleId];
     const isNew = !!set && !set.has(key);
-    if (set) set.add(key);
+    if (set) markViewedTwin(item.moduleId, key);
 
     const el = root.querySelector('[data-item-key="' + cssId(key) + '"]');
     const run = () => {
@@ -698,7 +770,7 @@ function refreshDropDisplay(moduleId, rowIndex, previousRow) {
         const item = board.items[k];
         const set = viewed[moduleId];
         const isNew = !!set && !set.has(k);
-        if (set) set.add(k);
+        if (set) markViewedTwin(moduleId, k);
         App.schema.Types[item.kind].open(item.value);
         setTimeout(() => injectModalNav(moduleId, k), 0);
         if (isNew && assocMods().some((m) => m.unlockAfter && m.unlockAfter.includes(moduleId))) {
