@@ -318,6 +318,12 @@
             </label>`).join('') || '<span class="hint">Aucun autre module.</span>'}
         </div>
       </div>
+      <div class="field">
+        <label class="inline" style="gap:.45rem">
+          <input id="mf-clickable" type="checkbox" ${m && m.clickable ? 'checked' : ''}>
+          Cliquable chez l'élève (modules informatifs : ouvre le contenu en grand dans une fenêtre)
+        </label>
+      </div>
       <div class="form-actions">
         <button type="submit" class="btn primary" id="mf-save">${isNew ? 'Ajouter' : 'Enregistrer'}</button>
         <button type="button" class="btn" id="mf-cancel">Annuler</button>
@@ -398,7 +404,10 @@
     }
 
     const poolColsRaw = document.getElementById('mf-poolcols').value;
-    const payload = { id, label, kind, role, unlockAfter, poolCols: poolColsRaw ? Number(poolColsRaw) : null };
+    const clickableEl = document.getElementById('mf-clickable');
+    const payload = { id, label, kind, role, unlockAfter,
+      poolCols: poolColsRaw ? Number(poolColsRaw) : null,
+      clickable: !!(clickableEl && clickableEl.checked) };
 
     if (editingModuleId == null) {
       const zoneEl = document.getElementById('mf-zone');
@@ -464,17 +473,22 @@
           esc(txt.slice(0, 160) || '(vide)') + '</div>';
       }
       if ((m.kind === 'audio' || m.kind === 'video') && v) {
+        const pres = v.html ? App.utils.stripHtml(v.html) : '';
         return num + '<div class="mini-info">' +
           esc(v.caption || '(sans titre)') +
           (v.src && !/^https?:/i.test(v.src)
             ? ' <span class="muted">(fichier intégré)</span>'
             : ' <span class="muted">(' + esc(v.src || 'aucune source') + ')</span>') +
+          (pres ? '<div class="muted">Présentation : ' + esc(pres.slice(0, 120)) + '</div>' : '') +
           '</div>';
       }
       if (m.kind === 'url' && v) {
+        const pres = v.html ? App.utils.stripHtml(v.html) : '';
         return num + '<div class="mini-info">' +
           esc(v.caption || '(sans titre)') + ' — ' +
-          '<a href="' + esc(v.src) + '" target="_blank" rel="noopener">' + esc(v.src) + '</a></div>';
+          (v.src ? '<a href="' + esc(v.src) + '" target="_blank" rel="noopener">' + esc(v.src) + '</a>' : '<span class="muted">(sans URL)</span>') +
+          (pres ? '<div class="muted">Présentation : ' + esc(pres.slice(0, 120)) + '</div>' : '') +
+          '</div>';
       }
       const s = v == null ? '' : (type.summary(v) || '');
       return num + '<div class="mini-info">' + esc(s || '(vide)') + '</div>';
@@ -572,9 +586,13 @@ $('#row-list').innerHTML = rows.map((r, i) => {
     const styleAttr = ` style="flex-grow:${grow}"`;
     const valid = Boolean(v != null && type && (!type.validate || type.validate(v)));
     const modAttr = ` data-module-id="${esc(m.id)}" title="${valid ? 'Modifier' : 'Ajouter'} ${esc(m.label || m.id)}"`;
+    const copyBtn = valid
+      ? `<button type="button" class="cell-copy btn small" data-cell-copy="1" data-module-id="${esc(m.id)}"
+           title="Copier ce contenu sur d'autres lignes" aria-label="Copier ce contenu sur d'autres lignes">⧉</button>`
+      : '';
 
     if (!valid) {
-      return `<div class="cell-box empty"${styleAttr}${modAttr}>${label}<div class="cell-content">—</div></div>`;
+      return `<div class="cell-box empty"${styleAttr}${modAttr}>${copyBtn}${label}<div class="cell-content">—</div></div>`;
     }
 
     let content = '';
@@ -614,7 +632,7 @@ $('#row-list').innerHTML = rows.map((r, i) => {
       content = `<span class="cell-snippet">${esc(s)}</span>`;
     }
 
-    return `<div class="cell-box${boxExtraClass}"${styleAttr}${modAttr}>${label}<div class="cell-content">${content}</div></div>`;
+    return `<div class="cell-box${boxExtraClass}"${styleAttr}${modAttr}>${copyBtn}${label}<div class="cell-content">${content}</div></div>`;
   }
 
   function startAddRow() {
@@ -721,6 +739,69 @@ $('#row-list').innerHTML = rows.map((r, i) => {
     hideSingleCellForm();
   }
 
+  /* Copie du contenu d'une cellule vers d'autres lignes.
+     Avec le pool dédupliqué côté élève, ces copies n'affichent qu'un seul
+     exemplaire dans la réserve, qui peut être redéposé autant de fois. */
+  function openCopyDialog(sourceRowId, moduleId) {
+    const m = allMods().find((x) => String(x.id) === String(moduleId));
+    const src = App.state.rows().find((x) => String(x.id) === String(sourceRowId));
+    if (!m || !src) return;
+    const type = App.schema.Types[m.kind];
+    const value = src.cells[m.id];
+    if (value == null || !type || (type.validate && !type.validate(value))) {
+      alert('Cette cellule est vide : rien à copier.');
+      return;
+    }
+    const others = App.state.rows().filter((x) => String(x.id) !== String(sourceRowId));
+    if (!others.length) {
+      alert("Il n'y a qu'une seule ligne : rien à copier.");
+      return;
+    }
+    const sigOf = (x) => JSON.stringify(x == null ? null : x);
+    const ownSig = sigOf(value);
+    const labelOf = (r) => {
+      const mod = allMods().find((mm) => mm.role === 'associate' &&
+        r.cells[mm.id] != null);
+      const txt = mod ? App.schema.Types[mod.kind].summary(r.cells[mod.id]) : '';
+      return 'Ligne ' + (App.state.rows().indexOf(r) + 1) + (txt ? ' — ' + App.utils.stripHtml(txt).slice(0, 40) : '');
+    };
+
+    const listHtml = others.map((r) => {
+      const same = sigOf(r.cells[m.id]) === ownSig;
+      return `
+        <label class="inline" style="gap:.4rem;padding:.15rem 0">
+          <input type="checkbox" class="copy-row" data-copy-row="${esc(r.id)}" ${same?'checked':''}>
+          ${esc(labelOf(r))}${same ? ' <span class="muted">(contenu identique)</span>' : ''}
+        </label>`;
+    }).join('');
+
+    App.modal.open({
+      title: 'Copier « ' + (m.label || m.id) + ' » vers d\'autres lignes',
+      html: `
+        <div class="hint" style="margin-bottom:.6rem">Le contenu copié remplace celui des lignes cochées.
+          Chez l'élève, ce module n'apparaît qu'une seule fois dans la réserve
+          et peut être redéposé sur chaque ligne concernée.</div>
+        <div id="copy-rows">${listHtml}</div>
+        <div class="form-actions" style="margin-top:1rem">
+          <button type="button" class="btn link" id="copy-all">Sélectionner toutes les lignes</button>
+          <button type="button" class="btn primary" id="copy-apply">Copier</button>
+          <button type="button" class="btn" data-close>Annuler</button>
+        </div>`
+    });
+
+    document.getElementById('copy-all').addEventListener('click', () => {
+      document.querySelectorAll('#copy-rows .copy-row').forEach((cb) => { cb.checked = true; });
+    });
+    document.getElementById('copy-apply').addEventListener('click', () => {
+      const updates = [...document.querySelectorAll('#copy-rows .copy-row:checked')]
+        .map((cb) => ({ id: cb.dataset.copyRow, cells: { [m.id]: JSON.parse(JSON.stringify(value)) } }));
+      if (!updates.length) { App.modal.close(); return; }
+      App.state.updateRowsBulk(updates);
+      App.modal.close();
+      renderRows();
+    });
+  }
+
   function renderModuleFieldset(m, value) {
     const type = App.schema.Types[m.kind];
     const fields = type.formSchema(value || type.createEmpty());
@@ -808,14 +889,56 @@ $('#row-list').innerHTML = rows.map((r, i) => {
               <span class="rte-sep"></span>
               <label class="rte-color"><input type="color" class="rte-color-input" data-color="fore" value="#dc2626"><span>Couleur</span></label>
               <label class="rte-color"><input type="color" class="rte-color-input" data-color="back" value="#fef3c7"><span>Surligner</span></label>
+              <span class="rte-sep"></span>
+              <button type="button" class="rte-btn" data-action="rte-image" title="Insérer une image">🖼</button>
               <button type="button" class="rte-btn" data-cmd="clear" title="Effacer la mise en forme">✕</button>
               <button type="button" class="rte-btn rte-student-preview" data-action="student-preview" title="Voir / éditer tel que vu par l'élève">👁</button>
             </div>
-            <div class="rte-editor" contenteditable="true" data-placeholder="${esc(field.label||'')}">${value}</div>
+            <div class="rte-editor" contenteditable="true" data-placeholder="${esc(field.label||'')}">${rteEditorHtml(value)}</div>
           </div>
         </div>`;
     }
     return `<p class="hint">Type de champ inconnu : ${esc(field.type)}</p>`;
+  }
+
+  /* Sélecteur de fichier + insertion dans l'éditeur riche.
+     Le fichier est rangé dans le magasin de médias (IndexedDB) comme pour
+     les images de modules ; l'éditeur l'affiche immédiatement. */
+  function pickAndInsertImage(editor) {
+    if (!editor) return;
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.addEventListener('change', () => {
+      const file = input.files && input.files[0];
+      if (!file) return;
+      const done = (ref) => {
+        editor.focus();
+        document.execCommand('insertHTML', false,
+          '<p><img src="' + esc(ref) + '" alt=""></p>');
+      };
+      if (App.media && typeof App.media.putFile === 'function') {
+        App.media.putFile(file).then(done).catch(() => fallbackImageInsert(file, done));
+        return;
+      }
+      fallbackImageInsert(file, done);
+    });
+    input.click();
+  }
+
+  function fallbackImageInsert(file, done) {
+    const reader = new FileReader();
+    reader.onload = () => done(String(reader.result));
+    reader.readAsDataURL(file);
+  }
+
+  /* Affichage de l'éditeur : les références « media: » sont montrées via
+     leur URL affichable ; l'enregistrement les reconvertit (voir collect). */
+  function rteEditorHtml(value) {
+    if (App.utils && typeof App.utils.resolveMediaInHtml === 'function') {
+      return App.utils.resolveMediaInHtml(value);
+    }
+    return value;
   }
 
   function fieldHtml(id, label, inputHtml) {
@@ -824,6 +947,14 @@ $('#row-list').innerHTML = rows.map((r, i) => {
 
   function bindFieldEvents(formEl) {
     formEl.addEventListener('click', (e) => {
+      const imgBtn = e.target.closest('[data-action="rte-image"]');
+      if (imgBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+        const rteEl = imgBtn.closest('.rte');
+        if (rteEl) pickAndInsertImage(rteEl.querySelector('.rte-editor'));
+        return;
+      }
       const previewBtn = e.target.closest('[data-action="student-preview"]');
       if (previewBtn) {
         e.preventDefault();
@@ -980,9 +1111,12 @@ function openStudentTextPreview(rteEl) {
     const editor = rteEl ? rteEl.querySelector('.rte-editor') : null;
     if (!editor) return;
     const rawHtml = editor.innerHTML || '';
-    const currentHtml = (App.utils && typeof App.utils.sanitizeRich === 'function')
+    let currentHtml = (App.utils && typeof App.utils.sanitizeRich === 'function')
       ? App.utils.sanitizeRich(rawHtml)
       : rawHtml;
+    if (App.utils && typeof App.utils.resolveMediaInHtml === 'function') {
+      currentHtml = App.utils.resolveMediaInHtml(currentHtml);
+    }
 
     const fieldset = rteEl.closest('.module-fieldset');
     const legendEl = fieldset ? fieldset.querySelector('legend') : null;
@@ -1051,7 +1185,10 @@ function openStudentTextPreview(rteEl) {
       if (f.type === 'richtext') {
         const editor = document.querySelector(
           '[data-rte-module="' + moduleId + '"][data-rte-field="' + f.name + '"] .rte-editor');
-        collected[f.name] = App.utils.sanitizeRich(editor ? editor.innerHTML : '');
+        const raw = editor ? editor.innerHTML : '';
+        const withRefs = App.utils.htmlWithMediaRefs
+          ? App.utils.htmlWithMediaRefs(raw) : raw;
+        collected[f.name] = App.utils.sanitizeRich(withRefs);
       } else {
         const el = document.getElementById(id);
         collected[f.name] = el ? el.value : '';
@@ -1085,6 +1222,14 @@ function openStudentTextPreview(rteEl) {
   }
 
   function onRowListClick(e) {
+    const copyBtn = e.target.closest('.cell-copy[data-module-id]');
+    if (copyBtn) {
+      e.stopPropagation();
+      const li = copyBtn.closest('li[data-row-id]');
+      if (li) openCopyDialog(li.dataset.rowId, copyBtn.dataset.moduleId);
+      return;
+    }
+
     const btn = e.target.closest('button[data-row-act]');
     if (btn && !btn.disabled) {
       const li = btn.closest('li[data-row-id]');
