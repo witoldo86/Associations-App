@@ -17,10 +17,13 @@
   // Zones recevant un bouton « + » d'ajout de module
   const ADD_ZONE = { columns: 'columns', 'pools-top': 'pools', 'pools-bottom': 'pools', left: 'left', right: 'right', hidden: 'hidden' };
 
-  const chipActions = (id) =>
+  const chipActions = (id, withColor) =>
     '<span class="mq-acts">' +
       '<button type="button" class="mq-act" data-mq-act="edit" data-act-id="' + esc(id) + '" title="Éditer ce module">✎</button>' +
       '<button type="button" class="mq-act" data-mq-act="view" data-act-id="' + esc(id) + '" title="Visualiser les contenus">📄</button>' +
+      (withColor
+        ? '<button type="button" class="mq-act" data-mq-act="color" data-act-id="' + esc(id) + '" title="Couleur du bac (réserves)">🎨</button>'
+        : '') +
       '<button type="button" class="mq-act danger" data-mq-act="del" data-act-id="' + esc(id) + '" title="Supprimer ce module">🗑</button>' +
     '</span>';
   const DRAG_THRESHOLD = 6;
@@ -78,6 +81,10 @@
     '<option value="' + k + '">' + esc(table[k].label) + '</option>').join('');
 
 
+  // Police « comme le layout » = option vide (la police générale s'applique)
+  const fontOptions = (cur) => '<option value=""' + (!cur ? ' selected' : '') +
+    '>Comme le layout</option>' + options(T.FONTS);
+
   function styleBarHtml() {
     return `
       <div class="mq-stylebar">
@@ -90,8 +97,12 @@
           <div class="field field-auto"><label for="mq-ink">Texte</label>
             <input id="mq-ink" type="color" data-mq="theme.ink"></div>
         </div>
-        <div class="field"><label for="mq-font">Police</label>
+        <div class="field"><label for="mq-font">Police (layout, contenus)</label>
           <select id="mq-font" data-mq="theme.font">${options(T.FONTS)}</select></div>
+        <div class="field"><label for="mq-titlefont">Police du titre</label>
+          <select id="mq-titlefont" data-mq="theme.titleFont">${fontOptions(draft && draft.theme.titleFont)}</select></div>
+        <div class="field"><label for="mq-subtitlefont">Police de la consigne</label>
+          <select id="mq-subtitlefont" data-mq="theme.subtitleFont">${fontOptions(draft && draft.theme.subtitleFont)}</select></div>
         <div class="field"><label for="mq-scale">Taille du texte</label>
           <select id="mq-scale" data-mq="theme.scale">${options(T.SCALES)}</select></div>
         <div class="field"><label for="mq-radius">Coins</label>
@@ -113,7 +124,8 @@
         Tout se pilote ici : glissez les modules pour les déplacer ou les réordonner,
         ajoutez-en avec le bouton <strong>＋</strong> de chaque zone, éditez/visualisez/supprimez
         avec <strong>✎ 📄 🗑</strong> au survol des blocs, modifiez le titre, la consigne
-        et la grille avec les boutons <strong>✎</strong> et <strong>⌗</strong> de l'aperçu. Les couleurs, la police,
+        et la grille avec les boutons <strong>✎</strong> et <strong>⌗</strong> de l'aperçu, et mélangez
+        les lignes avec <strong>🔀</strong> (espace « Ordre des lignes »). Les couleurs, la police,
         la taille du texte et les coins se règlent dans le cadre « Style général » au-dessus.
         Chaque réglage est
         <strong>enregistré automatiquement</strong> (indicateur en haut à droite) et aussitôt
@@ -199,7 +211,17 @@
       if (!id || !A) return;
       if (act.dataset.mqAct === 'edit') A.editModule(id);
       else if (act.dataset.mqAct === 'view') A.moduleContents(id);
+      else if (act.dataset.mqAct === 'color') openPoolColorDialog(id);
       else if (act.dataset.mqAct === 'del') A.removeModule(id);
+      return;
+    }
+    const sh = e.target.closest('[data-mq-shuffle]');
+    if (sh) {
+      e.preventDefault();
+      e.stopPropagation();
+      draft.rowIds = App.utils.shuffle(draft.rowIds);
+      renderPreview();
+      scheduleApply();
       return;
     }
     const dlg = e.target.closest('[data-mq-dialog]');
@@ -248,8 +270,11 @@
       poolsSide: draft.poolsSide, boardCols: draft.boardCols, poolsCols: draft.poolsCols
     });
     c.modules = clone(draft.modules);
+    // updateConfig déclenche onChange (le brouillon est reconstruit) :
+    // on garde donc l'ordre des lignes du brouillon AVANT l'appel.
+    const rowIds = draft.rowIds.slice();
     App.state.updateConfig(c);
-    App.state.reorderRows(draft.rowIds);
+    App.state.reorderRows(rowIds);
     return true;
   }
 
@@ -265,9 +290,11 @@
 
   const RESIZER = '<div class="mq-resizer" title=""></div>';
 
-  // Petits boutons d'édition placés dans l'aperçu (✎ textes, ⌗ grille)
+  // Petits boutons d'édition placés dans l'aperçu (✎ textes, ⌗ grille, 🔀 lignes)
   const editBtn = (kind, label) =>
     '<button type="button" class="mq-edit" data-mq-dialog="' + kind + '" title="' + label + '">✎</button>';
+  const SHUFFLE_BTN = '<button type="button" class="mq-edit" data-mq-shuffle ' +
+    'title="Mélanger les lignes (ordre aléatoire)">🔀</button>';
   const GRID_BTN = '<button type="button" class="mq-edit" data-mq-dialog="grid" ' +
     'title="Grille : modules par ligne (plateau et réserves)">⌗</button>';
 
@@ -310,6 +337,43 @@
     }).join('');
   }
 
+  /* Couleur pastel d'un bac de réserves (choix dans un échantillon) */
+  const PASTELS = [
+    ['', 'Aucune (couleur par défaut)'],
+    ['#fde68a', 'Jaune pastel'],
+    ['#fbcfe8', 'Rose pastel'],
+    ['#bfdbfe', 'Bleu pastel'],
+    ['#bbf7d0', 'Vert pastel'],
+    ['#ddd6fe', 'Violet pastel'],
+    ['#fed7aa', 'Orange pastel'],
+    ['#99f6e4', 'Turquoise pastel'],
+    ['#e5e7eb', 'Gris clair']
+  ];
+
+  function openPoolColorDialog(id) {
+    const m = draft.modules.find((x) => x.id === id);
+    if (!m) return;
+    const cur = m.poolColor || '';
+    const sw = PASTELS.map(([v, l]) =>
+      '<button type="button" class="swatch' + (v === cur ? ' is-selected' : '') +
+      '" data-swatch="' + esc(v) + '" style="background:' + (v || '#fff') +
+      '" title="' + esc(l) + '" aria-label="' + esc(l) + '"></button>').join('');
+    App.modal.open({
+      title: 'Couleur du bac « ' + modLabel(m) + ' » (affiché dans les réserves)',
+      html: '<div class="swatch-list">' + sw + '</div>' +
+        '<p class="hint">La couleur teinte le fond du bac côté élève.</p>'
+    });
+    [...document.querySelectorAll('[data-swatch]')].forEach((btn) => {
+      btn.addEventListener('click', () => {
+        m.poolColor = btn.dataset.swatch || '';
+        if (!m.poolColor) delete m.poolColor;
+        App.modal.close();
+        renderPreview();
+        scheduleApply();
+      });
+    });
+  }
+
   function renderPreview() {
     const t = T.resolve(draft.theme);
     const applied = T.scaleValue(T.resolve(App.state.config().theme).scale);
@@ -326,10 +390,16 @@
     const pcDraft = gridCols(draft.poolsCols, assoc.length);
     const pc = (pcDraft && pcDraft >= assoc.length) ? 0 : pcDraft;
     const poolsOneLine = !pc;
-    const miniChip = (m, flex) => '<span class="mq-mini" data-drag-kind="module" data-drag-id="' + esc(m.id) +
-      '" data-span-id="' + esc(m.id) + '"' +
-      (flex ? ' style="flex-grow:' + poolSpanOf(m) + ';flex-basis:0;min-width:0"' : '') +
-      ' title="' + esc(m.id) + '">' + esc(modLabel(m)) + chipActions(m.id) + '</span>';
+    const miniChip = (m, flex) => {
+      const st = [
+        flex ? 'flex-grow:' + poolSpanOf(m) + ';flex-basis:0;min-width:0' : '',
+        m.poolColor ? 'background:' + esc(m.poolColor) : ''
+      ].filter(Boolean).join(';');
+      return '<span class="mq-mini" data-drag-kind="module" data-drag-id="' + esc(m.id) +
+        '" data-span-id="' + esc(m.id) + '"' +
+        (st ? ' style="' + st + '"' : '') +
+        ' title="' + esc(m.id) + '">' + esc(modLabel(m)) + chipActions(m.id, true) + '</span>';
+    };
     let poolsInner;
     let poolsMiniAttr = '';
     if (poolsOneLine) {
@@ -376,7 +446,7 @@
         poolsZone('pools-bottom', 'bottom') +
       '</div>' +
       zoneHtml('hidden', 'Modules masqués (non affichés à l\'élève)', inZone('hidden').map(moduleChip).join(''), 'mq-hidden') +
-      zoneHtml('rows', 'Ordre des lignes', rowChips(), 'mq-rows');
+      zoneHtml('rows', 'Ordre des lignes', rowChips(), 'mq-rows', '', SHUFFLE_BTN);
   }
 
   /* =========================================================

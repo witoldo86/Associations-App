@@ -59,7 +59,7 @@
               tabindex="0" role="region" aria-label="Image agrandie, zone défilante"
               style="display:block;overflow:auto;position:relative;">
               <div id="image-zoom-stage" style="position:relative;margin:auto;">
-                <img id="image-zoom-picture" src="${s}" alt="${t}"
+                <img id="image-zoom-picture" src="${s}" alt="${t}" draggable="false"
                   style="position:absolute;max-width:none;max-height:none;object-fit:contain;display:block;">
               </div>
             </div>
@@ -132,6 +132,9 @@
       viewport.addEventListener('pointerdown', (e) => {
         if (Number(slider.value) <= 100) return;
         if (e.pointerType === 'mouse' && e.button !== 0) return;
+        // Sans preventDefault, un glissement SUR l'image lance le drag natif
+        // du navigateur (pointercancel) et la main ne fait rien.
+        e.preventDefault();
         isPanning = true;
         panStartX = e.clientX;
         panStartY = e.clientY;

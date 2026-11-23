@@ -120,10 +120,19 @@
     const zone = $('#s-pools-zone');
     zone.classList.remove('has-expanded-module');
     const poolPlan = gridPlan(mods, c.layout && c.layout.poolsCols, 'poolSpan');
-    const colHtml = (m) => `
+    const colHtml = (m) => {
+      const poolStyle = [
+        m.poolCols ? '--pool-cols:' + Number(m.poolCols) : '',
+        m.poolColor ? '--pool-color:' + esc(m.poolColor) : ''
+      ].filter(Boolean).join(';');
+      return `
         <div class="pool-col">
           <h3 class="pool-title">
+            <button type="button" class="module-nav" data-nav-dir="prev"
+              aria-label="Module précédent" title="Module précédent">‹</button>
             <span>${esc(modLabel(m))}</span>
+            <button type="button" class="module-nav" data-nav-dir="next"
+              aria-label="Module suivant" title="Module suivant">›</button>
             <button type="button" class="module-preview-open"
               data-preview-module="${esc(m.id)}"
               aria-label="Agrandir le module ${esc(modLabel(m))}"
@@ -134,8 +143,9 @@
               </svg>
             </button>
           </h3>
-          <div class="pool${m.poolCols ? ' is-gridded' : ''}" data-pool-module="${esc(m.id)}" id="pool-${esc(m.id)}"${m.poolCols ? ' style="--pool-cols:' + Number(m.poolCols) + '"' : ''}></div>
+          <div class="pool${m.poolCols ? ' is-gridded' : ''}${m.poolColor ? ' has-color' : ''}" data-pool-module="${esc(m.id)}" id="pool-${esc(m.id)}"${poolStyle ? ' style="' + poolStyle + '"' : ''}></div>
         </div>`;
+    };
     const poolsInner = poolPlan.lines > 1
       ? chunk(mods, poolPlan.cols).map((g) =>
           '<div class="pools-line" style="grid-template-columns:' + groupTpl(g, 'poolSpan') + '">' +
@@ -305,11 +315,31 @@
      AGRANDISSEMENT ANIMÉ D'UN MODULE (bouton œil)
      ========================================================= */
   function onModuleExpandClick(e) {
+    const nav = e.target.closest('.module-nav');
+    if (nav) {
+      if (!nav.disabled) navigateExpanded(nav.dataset.navDir === 'prev' ? -1 : 1);
+      return;
+    }
     const button = e.target.closest('.module-preview-open');
     if (!button || button.disabled) return;
     const id = button.dataset.previewModule;
     if (expandedModuleId === id) closeExpandedModule();
     else expandModule(id);
+  }
+
+  /* Navigation ‹ › entre les modules dans la vue agrandie ;
+     on saute les modules verrouillés et on boucle. */
+  function navigateExpanded(dir) {
+    const mods = assocMods();
+    if (!expandedModuleId || mods.length < 2) return;
+    const i = mods.findIndex((m) => m.id === expandedModuleId);
+    for (let step = 1; step <= mods.length; step++) {
+      const cand = mods[((i + dir * step) % mods.length + mods.length) % mods.length];
+      if (moduleState[cand.id] && !moduleState[cand.id].locked) {
+        expandModule(cand.id);
+        return;
+      }
+    }
   }
 
   function animateRect(el, from, to) {
@@ -340,15 +370,20 @@
     if (expandedModuleId) closeExpandedModule();
     expandedModuleId = moduleId;
     toggleExpanded(col, true);
+    updatePreviewButtons();
   }
 
   function closeExpandedModule() {
     const col = $('#s-pools-zone .pool-col.is-expanded');
     expandedModuleId = null;
     if (col) toggleExpanded(col, false);
+    updatePreviewButtons();
   }
 
   function updatePreviewButtons() {
+    root.querySelectorAll('.module-nav').forEach((nav) => {
+      nav.disabled = expandedModuleId ? false : true;
+    });
     root.querySelectorAll('.module-preview-open').forEach((button) => {
       const id = button.dataset.previewModule;
       const locked = !!(moduleState[id] && moduleState[id].locked);

@@ -35,7 +35,8 @@
   const DEFAULTS = {
     primary: '#2563eb', bg: '#f4f6f9', ink: '#1f2937',
     font: 'system', scale: 'normal', radius: 'soft',
-    titleSize: 'md', titleColor: '', subtitleSize: 'md'
+    titleSize: 'md', titleColor: '', subtitleSize: 'md',
+    titleFont: '', subtitleFont: ''
   };
 
   const HEX = /^#[0-9a-f]{6}$/i;
@@ -57,7 +58,9 @@
       radius: pick(RADII, t.radius, d.radius),
       titleSize: pick(TITLE_SIZES, t.titleSize, d.titleSize),
       titleColor: HEX.test(t.titleColor) ? t.titleColor : '',
-      subtitleSize: pick(SUBTITLE_SIZES, t.subtitleSize, d.subtitleSize)
+      subtitleSize: pick(SUBTITLE_SIZES, t.subtitleSize, d.subtitleSize),
+      titleFont: pick(FONTS, t.titleFont, ''),
+      subtitleFont: pick(FONTS, t.subtitleFont, '')
     };
   };
 
@@ -75,7 +78,9 @@
       '--radius': RADII[t.radius].v,
       '--title-size': TITLE_SIZES[t.titleSize].v,
       '--title-color': t.titleColor || 'var(--ink)',
-      '--subtitle-size': SUBTITLE_SIZES[t.subtitleSize].v
+      '--subtitle-size': SUBTITLE_SIZES[t.subtitleSize].v,
+      '--title-font': FONTS[t.titleFont] ? FONTS[t.titleFont].css : 'var(--font)',
+      '--subtitle-font': FONTS[t.subtitleFont] ? FONTS[t.subtitleFont].css : 'var(--font)'
     };
   };
 

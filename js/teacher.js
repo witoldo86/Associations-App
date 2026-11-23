@@ -48,9 +48,13 @@
     const value = isTitle ? (c.title || '') : (c.subtitle || '');
     const font = App.theme.FONTS[t.font] ? t.font : 'system';
     const sizeVal = App.theme.resolve(t)[sizeKey];
+    const fontKey = isTitle ? 'titleFont' : 'subtitleFont';
+    const ownFont = t[fontKey] || '';
     const fontOpts = Object.keys(App.theme.FONTS).map((k) =>
       '<option value="' + k + '"' + (k === font ? ' selected' : '') + '>' +
       esc(App.theme.FONTS[k].label) + '</option>').join('');
+    const ownFontOpts = '<option value=""' + (!ownFont ? ' selected' : '') + '>' +
+      'Comme tout l\'exercice</option>' + fontOpts;
     const sizeOpts = Object.keys(sizes).map((k) =>
       '<option value="' + k + '"' + (k === sizeVal ? ' selected' : '') + '>' +
       esc(sizes[k].label) + '</option>').join('');
@@ -72,8 +76,11 @@
                 esc(t.titleColor || t.ink || '#1f2937') + '">' +
                 '<button type="button" class="btn link" id="tx-color-auto">Auto</button></span></div>'
               : '') +
-            '<div class="field"><label for="tx-font">Police (tout l’exercice — titre, consigne, contenus)</label>' +
+            '<div class="field"><label for="tx-font">Police de tout l’exercice (layout, contenus)</label>' +
               '<select id="tx-font">' + fontOpts + '</select></div>' +
+            '<div class="field"><label for="tx-tfont">Police ' +
+              (isTitle ? 'du titre' : 'de la consigne') + '</label>' +
+              '<select id="tx-tfont">' + ownFontOpts + '</select></div>' +
           '</div>' +
           '<div class="form-actions">' +
             '<button type="button" class="btn" data-close>Fermer</button>' +
@@ -97,6 +104,7 @@
         font: document.getElementById('tx-font').value
       });
       c2.theme[sizeKey] = document.getElementById('tx-size').value;
+      c2.theme[fontKey] = document.getElementById('tx-tfont').value;
       if (isTitle) {
         c2.title = content;
         c2.theme.titleColor = autoColor ? '' : (colorInput.value || '');

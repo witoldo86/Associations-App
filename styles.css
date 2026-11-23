@@ -29,7 +29,7 @@ body{
   padding:.7rem 1.25rem; background:#fff; border-bottom:1px solid var(--line);
   position:sticky; top:0; z-index:20;
 }
-.app-header h1{ font-size:var(--title-size,1.05rem); color:var(--title-color,var(--ink)); margin:0; line-height:1.2; }
+.app-header h1{ font-size:var(--title-size,1.05rem); color:var(--title-color,var(--ink)); font-family:var(--title-font,var(--font)); margin:0; line-height:1.2; }
 .mode-switch{ display:flex; gap:.25rem; background:var(--bg); padding:.25rem; border-radius:999px; }
 .mode-switch button{
   border:0; background:transparent; padding:.4rem .9rem; border-radius:999px;
@@ -189,7 +189,7 @@ input:focus,textarea:focus{ outline:2px solid #bfdbfe; border-color:var(--primar
   display:flex; justify-content:space-between; align-items:center;
   gap:1rem; flex-wrap:wrap; margin-bottom:.75rem;
 }
-.instructions{ margin:0; font-size:var(--subtitle-size,.9rem); color:var(--muted); max-width:60ch; }
+.instructions{ margin:0; font-size:var(--subtitle-size,.9rem); color:var(--muted); font-family:var(--subtitle-font,var(--font)); max-width:60ch; }
 
 /* Réserves : hauteur pilotée par flex, 3 colonnes de même hauteur */
 .pools{
@@ -852,8 +852,10 @@ body.student-mode #s-pools-zone .pool{
    AGRANDISSEMENT ANIMÉ DES MODULES — bouton œil
    Le plateau de réponses reste toujours dans sa zone inférieure.
    ========================================================= */
+/* Titres de modules centrés au-dessus des blocs, œil juste à côté du nom */
 body.student-mode .pool-title{
-  display:flex; align-items:center; justify-content:space-between; gap:.4rem;
+  display:flex; align-items:center; justify-content:center; gap:.45rem;
+  margin-bottom:.35rem;
 }
 .module-preview-open{
   flex:0 0 auto; width:28px; height:28px; display:inline-flex;
@@ -931,9 +933,11 @@ body.student-mode #s-pools-zone.has-expanded-module .pool-col.is-expanded .pool{
 }
 .mq-title{
   font-weight:700; line-height:1.2; color:var(--title-color);
+  font-family:var(--title-font,var(--font));
   font-size:calc(var(--title-size) * .75 * var(--pv,1));
 }
-.mq-subtitle{ opacity:.75; font-size:calc(var(--subtitle-size) * .85 * var(--pv,1)); min-height:1em; }
+.mq-subtitle{ opacity:.75; font-family:var(--subtitle-font,var(--font));
+  font-size:calc(var(--subtitle-size) * .85 * var(--pv,1)); min-height:1em; }
 .mq-main{ display:grid; grid-template-columns:minmax(0,3fr); gap:.5rem; }
 
 .mq-zone{
@@ -1012,9 +1016,11 @@ body.student-mode #s-pools-zone.has-expanded-module .pool-col.is-expanded .pool{
 
 .item-ghost img {
   display: block;
-  max-width: none;
-  max-height: none;
-  object-fit: contain;
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: cover;
 }
 
 /* =========================================================
@@ -1197,4 +1203,45 @@ body.student-mode #s-pools-zone .pool-col.is-expanded .item-image{
 }
 body.student-mode #s-pools-zone .pool-col.is-expanded .item-image img{
   width:100%; height:100%; object-fit:cover;
+}
+
+/* =========================================================
+   COULEURS PASTEL DES BACS DE RÉSERVES (choisis par le prof)
+   ========================================================= */
+.pool.has-color{
+  background:var(--pool-color);
+  border-color:var(--pool-color);
+}
+.swatch-list{ display:flex; flex-wrap:wrap; gap:.5rem; margin-bottom:.5rem; }
+.swatch{
+  width:2.4rem; height:2.4rem; border-radius:10px; cursor:pointer;
+  border:2px solid var(--line); padding:0;
+}
+.swatch:hover{ border-color:var(--primary); }
+.swatch.is-selected{ border-color:var(--primary); box-shadow:0 0 0 3px rgba(37,99,235,.2); }
+
+/* =========================================================
+   NAVIGATION ‹ › ENTRE MODULES (vue agrandie, espace élève)
+   Les flèches ne sont visibles que dans la vue agrandie ; elles
+   sautent les modules verrouillés et bouclent sur la liste.
+   ========================================================= */
+.module-nav{
+  flex:0 0 auto; width:26px; height:26px; display:none;
+  align-items:center; justify-content:center; padding:0;
+  border:1px solid var(--line); border-radius:7px; background:#fff;
+  color:var(--muted); cursor:pointer; font-size:1rem; line-height:1;
+  transition:color .18s,border-color .18s,background .18s;
+}
+.pool-col.is-expanded .module-nav{ display:inline-flex; }
+.module-nav:hover{ color:var(--primary); border-color:var(--primary); background:#eff6ff; }
+.module-nav:disabled{ opacity:.3; cursor:not-allowed; }
+
+/* =========================================================
+   OUTIL MAIN DE LA MODAL IMAGE — glisser partout, y compris
+   SUR l'image (pas seulement sur les ascenseurs)
+   ========================================================= */
+.modal-image-body.is-zoomed{ touch-action:none; }
+.modal-image-body.is-zoomed img{ -webkit-user-drag:none; user-select:none; }
+@media(prefers-reduced-motion:reduce){
+  .module-nav{ transition:none; }
 }
