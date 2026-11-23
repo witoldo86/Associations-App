@@ -39,10 +39,44 @@
           if (!['left', 'right', 'hidden'].includes(m.zone)) {
             m.zone = legacySide === 'left' ? 'left' : (legacySide === 'none' ? 'hidden' : 'right');
           }
+          if (m.infoMode !== 'title') m.infoMode = 'full';
+          if (m.role !== 'associate' && m.data == null) m.data = null; // garde la clé propre
         } else {
           delete m.zone;
+          delete m.data;
         }
       });
+
+      /* Modules informatifs : UN SEUL contenu par module (indépendant des lignes).
+         Les anciennes données par ligne (imports v1/v2) sont fusionnées au mieux. */
+      const mergeInfo = (m) => {
+        const type = App.schema.Types[m.kind];
+        if (!type) return;
+        if (m.data != null && type.validate(m.data)) {
+          if (m.data && typeof m.data === 'object' && typeof m.data.html === 'string') {
+            m.data.html = App.utils.sanitizeRich(m.data.html);
+          }
+          return;
+        }
+        const valid = this.data.rows
+          .map((r) => (r.cells && r.cells[m.id] != null)
+            ? App.schema.coerceValue(m.kind, r.cells[m.id]) : null)
+          .filter((v) => v != null && type.validate(v));
+        if (!valid.length) { m.data = type.createEmpty(); return; }
+        if (m.kind === 'richtext') {
+          const withTitle = valid.find((v) => v.title && String(v.title).trim());
+          m.data = { title: String((withTitle && withTitle.title) || ''),
+                     html: App.utils.sanitizeRich(valid.map((v) => String(v.html || '')).filter(Boolean).join('')) };
+        } else if (m.kind === 'text') {
+          m.data = valid.join('\n');
+        } else if (m.kind === 'audio' || m.kind === 'video' || m.kind === 'url') {
+          const html = App.utils.sanitizeRich(valid.map((v) => String(v.html || '')).filter(Boolean).join(''));
+          m.data = { src: valid[0].src || '', caption: valid[0].caption || '', html };
+        } else {
+          m.data = valid[0];
+        }
+      };
+      cfg.modules.forEach((m) => { if (m.role === 'informative') mergeInfo(m); });
       cfg.layout = Object.assign({}, cfg.layout);
       delete cfg.layout.infoSide;
       if (cfg.layout.poolsSide !== 'bottom') cfg.layout.poolsSide = 'top';

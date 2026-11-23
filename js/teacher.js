@@ -147,8 +147,8 @@
             '<select id="gd-pools">' + opts(gridNLocal(l.poolsCols)) + '</select></div>' +
           '<div class="field"><label for="gd-infos">Panneaux d\'information (gauche / droite)</label>' +
             '<select id="gd-infos">' +
-              '<option value="board"' + (!l.infosBesidePools ? ' selected' : '') + '>À côté du plateau (défaut)</option>' +
-              '<option value="pools"' + (l.infosBesidePools ? ' selected' : '') + '>À côté des réserves (au même niveau)</option>' +
+              '<option value="board"' + (!l.infosBesidePools ? ' selected' : '') + '>À gauche et à droite du plateau (défaut)</option>' +
+              '<option value="pools"' + (l.infosBesidePools ? ' selected' : '') + '>À gauche et à droite des réserves</option>' +
             '</select></div>' +
           '<p class="hint">Le <strong>plateau</strong> est la zone où l’élève dépose ses réponses ; ' +
             'les <strong>réserves</strong> sont les bacs d’où il pioche les éléments. ' +
@@ -307,7 +307,8 @@
       ? `<fieldset class="module-fieldset">
           <legend>Apparition du panneau (optionnel)</legend>
           <div class="hint" style="margin-bottom:.3rem">Le panneau d'information apparaît dès que l'élève complète
-            l'une des lignes cochées. Sans coche : toujours visible.
+            l'une des lignes cochées, et/ou après avoir consulté les éléments des modules
+            cochés dans le « Verrouillage pédagogique » ci-dessus. Sans coche : visible dès le début.
             ${rowList.length ? '' : 'Créez d’abord des lignes pour pouvoir les cocher.'}</div>
           <div class="inline">
           ${rowList.map((r, i) => `
@@ -372,7 +373,14 @@
         </label>
       </div>
       ${revealBlock}
-      ${isInfo ? '<p class="hint">Contenu informatif : il s\'édite ligne par ligne avec le bouton 📝 du bloc, dans la maquette (pas dans les lignes de l\'exercice).</p>' : ''}
+      ${isInfo ? `<div class="field">
+          <label>Affichage du panneau d'information</label>
+          <select id="mf-infomode">
+            <option value="full" ${(m && m.infoMode !== 'title') ? 'selected' : ''}>Tout le contenu, déplié dans le panneau</option>
+            <option value="title" ${(m && m.infoMode === 'title') ? 'selected' : ''}>Seulement le titre — un clic ouvre la fenêtre du contenu</option>
+          </select>
+        </div>
+        <p class="hint">Contenu informatif : un seul contenu, indépendant des lignes, édité avec le bouton 📝 du bloc dans la maquette.</p>` : ''}
       <div class="form-actions">
         <button type="submit" class="btn primary" id="mf-save">${isNew ? 'Ajouter' : 'Enregistrer'}</button>
         <button type="button" class="btn" id="mf-cancel">Annuler</button>
@@ -460,8 +468,11 @@
       poolCols: poolColsRaw ? Number(poolColsRaw) : null,
       clickable: !!(clickableEl && clickableEl.checked),
       /* Panneau informatif visible dès qu'une des lignes cochées est
-         complétée par l'élève (liste vide = toujours visible). */
-      revealRows: role === 'informative' ? revealChecked : [] };
+         complétée (ou des éléments consultés, via le verrou) ; liste
+         vide = toujours visible. */
+      revealRows: role === 'informative' ? revealChecked : [],
+      infoMode: role === 'informative' && document.getElementById('mf-infomode') &&
+        document.getElementById('mf-infomode').value === 'title' ? 'title' : 'full' };
 
     if (editingModuleId == null) {
       const zoneEl = document.getElementById('mf-zone');
@@ -502,6 +513,19 @@
     if (!m) return;
     const type = App.schema.Types[m.kind];
     const rows = App.state.rows();
+
+    if (m.role === 'informative') {
+      const v = m.data;
+      const ok = v != null && type.validate && type.validate(v);
+      const s = ok ? (type.summary(v) || '(contenu)') : '(vide)';
+      App.modal.open({
+        title: (m.label || m.id) + ' — contenu du panneau',
+        html: '<div class="module-contents">' +
+          '<div class="mini-info-head">' + (ok ? 'Défini' : 'Vide') + '</div>' +
+          '<div class="mini-info">' + esc(String(s).slice(0, 400)) + '</div></div>'
+      });
+      return;
+    }
 
     let count = 0;
     const items = rows.map((r, rowIndex) => {
@@ -555,34 +579,25 @@
   }
 
   /* =========================================================
-     CONTENUS D'INFORMATION — une fenêtre dédiée, ligne par ligne
-     Les modules informatifs ne figurent plus dans le formulaire des
-     lignes : tout leur contenu s'édite ici (bouton 📝 dans la maquette).
+     CONTENU D'UN MODULE D'INFORMATION — fenêtre dédiée (bouton 📝)
+     Un seul contenu par module, indépendant des lignes : édité dans
+     les mêmes champs (zone de texte enrichi, image, média…) que les
+     cellules, stocké une fois pour toutes dans la fiche du module.
      ========================================================= */
   function openInfoContents(moduleId) {
     const m = allMods().find((x) => String(x.id) === String(moduleId));
-    if (!m) return;
-    const rows = App.state.rows();
-    if (!rows.length) {
-      alert("Cr\u00e9ez d'abord au moins une ligne : les contenus d'information sont d\u00e9finis ligne par ligne.");
-      return;
-    }
+    if (!m || m.role !== 'informative') return;
     const type = App.schema.Types[m.kind];
-    const keyOf = (r) => m.id + '__' + String(r.id);
-    const body = rows.map((r, i) => {
-      const v = r.cells[m.id] != null ? r.cells[m.id] : type.createEmpty();
-      return '<div class="info-row-block"><h4 class="info-row-title">Ligne ' + (i + 1) + '</h4>' +
-        renderModuleFieldset(m, v, keyOf(r)) + '</div>';
-    }).join('');
+    const value = m.data != null ? m.data : type.createEmpty();
 
     App.modal.open({
-      title: 'Contenus d\'information : ' + (m.label || m.id),
+      title: 'Contenu d\'information : ' + (m.label || m.id),
       html:
         '<form id="info-form" novalidate onsubmit="return false">' +
-        '<p class="hint">Un contenu par ligne : chez l\'\u00e9l\u00e8ve, le panneau affiche ' +
-        'les contenus des lignes correspondantes (selon la condition d\'apparition choisie ' +
-        'dans la fen\u00eatre du module).</p>' +
-        body +
+        '<p class="hint">Un seul contenu pour ce panneau, indépendant des lignes. ' +
+        'L\'affichage (tout déplié ou titre seul) se choisit dans la fenêtre ' +
+        'du module (bouton ✎ de la maquette).</p>' +
+        renderModuleFieldset(m, value) +
         '<div class="form-actions">' +
           '<button type="button" class="btn" data-close>Fermer</button>' +
           '<button type="button" class="btn primary" id="info-save">Enregistrer</button>' +
@@ -591,11 +606,12 @@
     });
 
     document.getElementById('info-save').addEventListener('click', () => {
-      const updates = rows.map((r) => ({
-        id: r.id,
-        cells: { [m.id]: App.schema.buildPayload(m.kind, collectFields(m.kind, keyOf(r))) }
-      }));
-      App.state.updateRowsBulk(updates);
+      const c = cfg();
+      const mod = c.modules.find((x) => String(x.id) === String(moduleId));
+      if (mod) {
+        mod.data = App.schema.buildPayload(mod.kind, collectFields(mod.kind, mod.id));
+        App.state.updateConfig(c);
+      }
       App.modal.close();
       renderRows();
     });
@@ -1082,7 +1098,6 @@ $('#row-list').innerHTML = rows.map((r, i) => {
       if (btn) {
         e.preventDefault();
         const editor = btn.closest('.rte').querySelector('.rte-editor');
-        editor.focus();
         rteRestoreSelection(editor);
         const cmd = btn.dataset.cmd;
         document.execCommand(cmd === 'clear' ? 'removeFormat' : cmd, false, null);
@@ -1103,7 +1118,6 @@ $('#row-list').innerHTML = rows.map((r, i) => {
       const colorInput = e.target.closest('.rte-color-input');
       if (colorInput) {
         const editor = colorInput.closest('.rte').querySelector('.rte-editor');
-        editor.focus();
         rteRestoreSelection(editor);
         document.execCommand(colorInput.dataset.color === 'fore' ? 'foreColor' : 'hiliteColor', false, colorInput.value);
         return;
@@ -1154,6 +1168,7 @@ $('#row-list').innerHTML = rows.map((r, i) => {
      ========================================================= */
   const rteRanges = new WeakMap();
   document.addEventListener('selectionchange', () => {
+    if (Date.now() < rteSelLock) return;
     const sel = window.getSelection();
     if (!sel || !sel.rangeCount || !sel.anchorNode) return;
     const node = sel.anchorNode.nodeType === 1 ? sel.anchorNode : sel.anchorNode.parentElement;
@@ -1162,16 +1177,24 @@ $('#row-list').innerHTML = rows.map((r, i) => {
     if (host && host.isContentEditable) rteRanges.set(host, sel.getRangeAt(0).cloneRange());
   });
 
+  /* Verrou court : le focus() déclenche un selectionchange qui ramène le
+     curseur au début de l'éditeur — on l'ignore pendant la restauration. */
+  let rteSelLock = 0;
   function rteRestoreSelection(editor) {
     const r = rteRanges.get(editor);
-    const sel = window.getSelection();
-    if (!r || !sel) return false;
-    try { sel.removeAllRanges(); sel.addRange(r); } catch (err) { return false; }
-    return true;
+    rteSelLock = Date.now() + 200;
+    editor.focus();
+    if (r) {
+      try {
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(r);
+      } catch (err) { return false; }
+    }
+    return !!r;
   }
 
   function applyRteSpanStyle(editor, cssProp, cssVal) {
-    editor.focus();
     rteRestoreSelection(editor);
     const sel = window.getSelection();
     if (!sel || !sel.rangeCount) return;
@@ -1213,7 +1236,6 @@ $('#row-list').innerHTML = rows.map((r, i) => {
   }
 
 function applyRteLineHeight(editor, lineHeightVal) {
-    editor.focus();
     rteRestoreSelection(editor);
     if (!lineHeightVal) {
       editor.style.lineHeight = '';
