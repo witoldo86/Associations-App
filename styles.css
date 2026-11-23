@@ -1237,9 +1237,10 @@ body.student-mode #s-pools-zone .pool-col.is-expanded .item-image img{
 }
 .module-nav[data-nav-dir="prev"]{ left:.15rem; }
 .module-nav[data-nav-dir="next"]{ right:.15rem; }
-.pool-col.is-expanded .module-nav{ display:flex; }
-.module-nav:hover{ opacity:1; color:var(--primary); background:transparent; }
-.module-nav:disabled{ opacity:.08; cursor:default; }
+/* L'affichage (display) des flèches est piloté par js/student.js.
+   Le survol utilise !important pour l'emporter sur l'opacité en filigrane. */
+.module-nav:hover{ opacity:1 !important; color:var(--primary) !important; background:transparent; }
+.module-nav:disabled{ opacity:.08 !important; cursor:default; }
 @media(min-width:900px){
   body.student-mode #s-pools-zone .pool-col.is-expanded .pool{ margin:0 2.8rem; }
 }

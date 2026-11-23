@@ -141,9 +141,11 @@
           </h3>
           <div class="pool${m.poolCols ? ' is-gridded' : ''}${m.poolColor ? ' has-color' : ''}" data-pool-module="${esc(m.id)}" id="pool-${esc(m.id)}"${poolStyle ? ' style="' + poolStyle + '"' : ''}></div>
           <button type="button" class="module-nav" data-nav-dir="prev"
-            aria-label="Module précédent" title="Module précédent">‹</button>
+            aria-label="Module précédent" title="Module précédent"
+            style="display:none;position:absolute;top:50%;transform:translateY(-50%);left:.15rem;width:40px;height:56px;font-size:2.4rem;line-height:1;border:none;background:transparent;color:#475569;opacity:.35;cursor:pointer;z-index:6">‹</button>
           <button type="button" class="module-nav" data-nav-dir="next"
-            aria-label="Module suivant" title="Module suivant">›</button>
+            aria-label="Module suivant" title="Module suivant"
+            style="display:none;position:absolute;top:50%;transform:translateY(-50%);right:.15rem;width:40px;height:56px;font-size:2.4rem;line-height:1;border:none;background:transparent;color:#475569;opacity:.35;cursor:pointer;z-index:6">›</button>
         </div>`;
     };
     const poolsInner = poolPlan.lines > 1
@@ -359,6 +361,11 @@
     col.classList.toggle('is-expanded', expand);
     zone.classList.toggle('has-expanded-module', expand);
     if (expand) col.style.maxHeight = '';
+    // L'affichage des flèches est piloté ici (et non par la feuille de
+    // style) : elles apparaissent ainsi même avec un CSS non à jour.
+    col.querySelectorAll('.module-nav').forEach((n) => {
+      n.style.display = expand ? 'flex' : 'none';
+    });
     animateRect(col, before, col.getBoundingClientRect());
     updatePreviewButtons();
   }
