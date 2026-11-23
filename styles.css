@@ -1301,3 +1301,42 @@ body.student-mode #s-pools-zone .pool-col.is-expanded .item-image img{
   background:#fff; color:#475569;
 }
 .cell-copy:hover{ background:#eef2ff; color:var(--primary, #6366f1); }
+
+/* =========================================================
+   EDITION TITRE / CONSIGNE : boutons bien visibles dans l'aperçu
+   ========================================================= */
+.mq-title .mq-edit, .mq-subtitle .mq-edit{
+  opacity:1;
+  width:1.85rem; height:1.85rem; font-size:1rem;
+  background:var(--primary,#2563eb); border-color:var(--primary,#2563eb);
+  color:#fff; border-radius:8px;
+}
+.mq-title .mq-edit:hover, .mq-subtitle .mq-edit:hover{
+  background:#1d4ed8; border-color:#1d4ed8; color:#fff;
+}
+
+/* Consigne enrichie : images contenues dans le bloc */
+.instructions img{ max-width:100%; height:auto; }
+
+/* =========================================================
+   CONTENUS D'INFORMATION — fenêtre ligne par ligne (espace prof)
+   ========================================================= */
+.info-row-block{
+  border:1px solid var(--line); border-radius:10px;
+  padding:.6rem .75rem; margin-bottom:.75rem; background:#f8fafc;
+}
+.info-row-title{
+  margin:.1rem 0 .5rem; font-size:.85rem; text-transform:uppercase;
+  letter-spacing:.05em; color:var(--muted);
+}
+
+/* =========================================================
+   PANNEAUX D'INFORMATION À CÔTÉ DES RÉSERVES
+   (maquette comme espace élève, selon le choix dans la fenêtre Grille)
+   ========================================================= */
+.mq-beside-row{ display:flex; gap:.5rem; align-items:stretch; min-width:0; }
+.mq-beside-row .mq-zone.mq-pools{ flex:1 1 60%; min-width:0; }
+.mq-beside-row .mq-zone.mq-side{ flex:0 0 190px; }
+#s-pools-zone.pools-with-infos{ display:flex; gap:.75rem; }
+#s-pools-zone.pools-with-infos > .pools{ flex:1 1 0; }
+#s-pools-zone.pools-with-infos > .info-sidebar{ flex:0 0 240px; }

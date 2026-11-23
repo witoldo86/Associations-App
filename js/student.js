@@ -63,7 +63,7 @@
     root.innerHTML = `
     <div class="student view-student-layout">
       <div class="student-toolbar">
-        <p class="instructions" id="s-instructions"></p>
+        <div class="instructions" id="s-instructions"></div>
         <div class="tools">
           <button type="button" class="btn" id="s-save" disabled>Enregistrer mes réponses</button>
           <button type="button" class="btn" id="s-reset">Recommencer</button>
@@ -123,10 +123,27 @@
     const c = cfg();
     const mods = assocMods();
 
-    $('#s-instructions').textContent = c.subtitle || '';
+    const subEl = $('#s-instructions');
+    const sub = c.subtitle || '';
+    if (/<[a-z!/]/i.test(sub)) {
+      subEl.innerHTML = App.utils.resolveMediaInHtml
+        ? App.utils.resolveMediaInHtml(sub) : sub;
+    } else {
+      subEl.textContent = sub;
+    }
     $('.student').classList.toggle('pools-bottom', !!(c.layout && c.layout.poolsSide === 'bottom'));
 
+    /* Panneaux d'information : à côté du plateau (position d'origine) ou
+       à côté des réserves. On remet d'abord les asides dans la rangée
+       principale AVANT de réécrire le contenu de la zone des réserves. */
     const zone = $('#s-pools-zone');
+    const mainRow = root.querySelector('.student-main-row');
+    const asideL = $('#s-info-left');
+    const asideR = $('#s-info-right');
+    const beside = !!(c.layout && c.layout.infosBesidePools);
+    if (asideL && asideL.parentElement !== mainRow) mainRow.insertBefore(asideL, document.getElementById('board'));
+    if (asideR && asideR.parentElement !== mainRow) mainRow.appendChild(asideR);
+    zone.classList.remove('pools-with-infos');
     zone.classList.remove('has-expanded-module');
     const poolPlan = gridPlan(mods, c.layout && c.layout.poolsCols, 'poolSpan');
     const colHtml = (m) => {
@@ -166,6 +183,11 @@
      '<div class="pools' + (poolPlan.lines > 1 ? ' pools-rows' : '') +
       '" style="--cols:' + poolPlan.cols + (poolPlan.lines > 1 ? '' : ';--cols-tpl:' + poolPlan.tpl) + '">' +
       poolsInner + '</div>';
+    if (beside) {
+      zone.classList.add('pools-with-infos');
+      zone.insertBefore(asideL, zone.firstChild);
+      zone.appendChild(asideR);
+    }
     expandedModuleId = null;
 
     viewed = {};
@@ -309,9 +331,27 @@
     balancePools();
   }
 
+  /* Ligne du plateau complétée : chaque module à associer y a un élément déposé. */
+  function boardRowComplete(rowIndex) {
+    return assocMods().every((m) =>
+      (board.keys[m.id] || []).some((k) => board.placement[k] === rowIndex));
+  }
+
+  /* Condition d'apparition d'un module informatif : visible dès qu'une des
+     lignes choisies par le prof est complétée (aucune ligne choisie = toujours). */
+  function infoVisible(m) {
+    const reveal = Array.isArray(m.revealRows) ? m.revealRows : [];
+    if (!reveal.length) return true;
+    const rows = App.state.rows();
+    return reveal.some((rid) => {
+      const i = rows.findIndex((x) => String(x.id) === String(rid));
+      return i >= 0 && boardRowComplete(i);
+    });
+  }
+
   function renderInfoSidebars() {
     const rows = App.state.rows();
-    const infos = infoMods();
+    const infos = infoMods().filter((m) => infoVisible(m));
 
     [['left', $('#s-info-left')], ['right', $('#s-info-right')]].forEach(([side, el]) => {
       const html = infos.filter((m) => m.zone === side).map((m) => {
@@ -691,6 +731,7 @@ function refreshDropDisplay(moduleId, rowIndex, previousRow) {
   });
 
   updateSaveButton();
+  renderInfoSidebars();
 }
 
   /* =========================================================

@@ -48,6 +48,12 @@
       if (cfg.layout.poolsSide !== 'bottom') cfg.layout.poolsSide = 'top';
       cfg.theme = App.theme.resolve(cfg.theme);
 
+      // Consigne enrichie : on ne fait confiance au HTML reçu (import)
+      // que s'il contient des balises ; sinon le texte brut garde ses sauts de ligne.
+      if (typeof cfg.subtitle === 'string' && /<[a-z!/]/i.test(cfg.subtitle)) {
+        cfg.subtitle = App.utils.sanitizeRich(cfg.subtitle);
+      }
+
       // Textes enrichis : cartels, plus les présentations des son/vidéo/page web
       const rich = cfg.modules.filter((m) =>
         m.kind === 'richtext' || m.kind === 'audio' || m.kind === 'video' || m.kind === 'url');
