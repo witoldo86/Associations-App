@@ -730,8 +730,11 @@ $('#row-list').innerHTML = rows.map((r, i) => {
     const val = collectModuleValue(m.id);
     const type = App.schema.Types[m.kind];
     if (type && typeof type.validate === 'function' && !type.validate(val)) {
-      alert('Erreur :\n\n• ' + (m.label || type.label) + ' : contenu manquant ou invalide');
-      return;
+      const ok = confirm(
+        'Le contenu de « ' + (m.label || type.label) + ' » est vide ou incomplet.\n\n' +
+        'Enregistrer quand m\u00eame ? Vous pourrez compléter cet élément plus tard.'
+      );
+      if (!ok) return;
     }
 
     App.state.updateRow(rowId, { [m.id]: val });
@@ -1207,8 +1210,14 @@ function openStudentTextPreview(rteEl) {
     const fakeRow = { id: editingRowId || 'tmp', cells };
     const errors = App.schema.validateRow(fakeRow, cfg());
     if (errors.length) {
-      alert('Erreurs :\n\n' + errors.map((x) => '• ' + x.message).join('\n'));
-      return;
+      /* Une ligne incomplète est admissible : le prof complète plus tard.
+         La confirm ne demande son accord que si des éléments sont vides. */
+      const ok = confirm(
+        'Cette ligne est incompl\u00e8te (\u00e9l\u00e9ments laiss\u00e9s \u00e0 remplir) :\n\n' +
+        errors.map((x) => '• ' + x.message).join('\n') +
+        '\n\nEnregistrer quand m\u00eame ? Vous pourrez compléter ces éléments plus tard.'
+      );
+      if (!ok) return;
     }
     if (editingRowId) {
       App.state.updateRow(editingRowId, cells);
