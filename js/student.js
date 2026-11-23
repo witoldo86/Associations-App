@@ -96,12 +96,12 @@
     $('#s-save').addEventListener('click', onSave);
     root.addEventListener('click', (e) => {
       const el = e.target.closest('.info-item-clickable');
-      if (el) openInfoModal(el.dataset.infoModule, el.dataset.infoRow);
+      if (el) openInfoModal(el.dataset.infoModule);
     });
     root.addEventListener('keydown', (e) => {
       if (e.key !== 'Enter' && e.key !== ' ') return;
       const el = e.target.closest ? e.target.closest('.info-item-clickable') : null;
-      if (el) { e.preventDefault(); openInfoModal(el.dataset.infoModule, el.dataset.infoRow); }
+      if (el) { e.preventDefault(); openInfoModal(el.dataset.infoModule); }
     });
 
     // L'écouteur est sur document : root n'a jamais le focus clavier
@@ -337,9 +337,34 @@
       (board.keys[m.id] || []).some((k) => board.placement[k] === rowIndex));
   }
 
-  /* Condition d'apparition d'un module informatif : visible dès qu'une des
-     lignes choisies par le prof est complétée (aucune ligne choisie = toujours). */
+  /* Contenu du panneau : valide s'il est défini (un seul contenu par module). */
+  function infoDataOf(m) {
+    const type = App.schema.Types[m.kind];
+    return (type && m.data != null && type.validate(m.data)) ? m.data : null;
+  }
+
+  /* Titre affiché quand le prof choisit « seulement le titre ». */
+  function infoTitleOf(m) {
+    const v = infoDataOf(m);
+    const t = v == null ? '' : (typeof v === 'string' ? v : String(v.title || v.caption || ''));
+    return (App.utils.stripHtml(t) || modLabel(m)).slice(0, 80);
+  }
+
+  /* Condition « consultation » : tous les éléments des modules cochés
+     (verrouillage pédagogique) ont été ouverts par l'élève. */
+  function infoDepsViewed(m) {
+    if (!m.unlockAfter || !m.unlockAfter.length) return true;
+    return m.unlockAfter.every((depId) => {
+      const keys = (board && board.keys[depId]) || [];
+      const set = viewed[depId];
+      return keys.length === 0 || (!!set && keys.every((k) => set.has(k)));
+    });
+  }
+
+  /* Condition d'apparition d'un module informatif : lignes complétées
+     (au choix du prof) et/ou éléments consultés. Sans condition : toujours. */
   function infoVisible(m) {
+    if (!infoDepsViewed(m)) return false;
     const reveal = Array.isArray(m.revealRows) ? m.revealRows : [];
     if (!reveal.length) return true;
     const rows = App.state.rows();
@@ -350,25 +375,21 @@
   }
 
   function renderInfoSidebars() {
-    const rows = App.state.rows();
-    const infos = infoMods().filter((m) => infoVisible(m));
+    const infos = infoMods().filter((m) => infoVisible(m) && infoDataOf(m));
 
     [['left', $('#s-info-left')], ['right', $('#s-info-right')]].forEach(([side, el]) => {
       const html = infos.filter((m) => m.zone === side).map((m) => {
         const type = App.schema.Types[m.kind];
-        if (!type) return '';
-        const items = rows
-          .filter((r) => r.cells[m.id] != null && type.validate(r.cells[m.id]))
-          .map((r) => {
-            const rendered = type.render(r.cells[m.id], { key: 'info_' + m.id + '_' + r.id, static: true });
-            if (!m.clickable) return rendered;
-            return '<div class="info-item-clickable" data-info-module="' + esc(m.id) +
-              '" data-info-row="' + esc(r.id) + '" role="button" tabindex="0" ' +
-              'title="Afficher en grand">' + rendered + '</div>';
-          });
-        return items.length
-          ? '<div class="info-module"><h4>' + esc(modLabel(m)) + '</h4>' + items.join('') + '</div>'
-          : '';
+        const head = '<div class="info-module"><h4>' + esc(modLabel(m)) + '</h4>';
+        if (m.infoMode === 'title') {
+          return head +
+            '<button type="button" class="info-title-link info-item-clickable" data-info-module="' + esc(m.id) + '"' +
+            ' title="Afficher en grand">' + esc(infoTitleOf(m)) + '</button></div>';
+        }
+        const rendered = type.render(m.data, { key: 'info_' + m.id, static: true });
+        if (!m.clickable) return head + rendered + '</div>';
+        return '<div class="info-item-clickable" data-info-module="' + esc(m.id) +
+          '" role="button" tabindex="0" title="Afficher en grand">' + rendered + '</div>';
       }).join('');
       el.innerHTML = html;
       el.hidden = !html;
@@ -381,13 +402,12 @@
 
   /* Module d'information cliquable : fenêtre adaptée au contenu
      (texte agrandi, image agrandie, média lisible… ). */
-  function openInfoModal(moduleId, rowId) {
+  function openInfoModal(moduleId) {
     const m = infoMods().find((x) => String(x.id) === String(moduleId));
-    const row = App.state.rows().find((x) => String(x.id) === String(rowId));
-    if (!m || !row) return;
-    const v = row.cells[m.id];
+    if (!m) return;
+    const v = infoDataOf(m);
     const type = App.schema.Types[m.kind];
-    if (!type || !v || (type.validate && !type.validate(v))) return;
+    if (!type || !v) return;
 
     if (m.kind === 'image') {
       App.modal.openImage(App.media.resolve(v.src), v.caption || modLabel(m));
@@ -763,6 +783,11 @@ function refreshDropDisplay(moduleId, rowIndex, previousRow) {
       // Le rendu n'est refait que si cette ouverture peut changer un verrou
       if (isNew && assocMods().some((m) => m.unlockAfter && m.unlockAfter.includes(item.moduleId))) {
         render();
+      } else if (isNew) {
+        // Un panneau d'information peut dépendre de la consultation des éléments
+        const depInfo = cfg().modules.some((m) => m.role === 'informative' &&
+          Array.isArray(m.unlockAfter) && m.unlockAfter.includes(item.moduleId));
+        if (depInfo) renderInfoSidebars();
       }
     };
 
