@@ -1289,6 +1289,18 @@ body.student-mode #s-pools-zone .pool-col.is-expanded .item-image img{
 .info-item-clickable:focus-visible{
   box-shadow:0 0 0 2px var(--primary, #6366f1);
 }
+.info-title-link{
+  display:block; width:100%; margin:.2rem 0 .3rem;
+  padding:.45rem .6rem; text-align:left;
+  font:inherit; font-size:1rem; font-weight:600; line-height:1.4;
+  color:var(--primary, #6366f1); background:#fff;
+  border:1px solid var(--line); border-radius:6px;
+  cursor:pointer; overflow-wrap:anywhere;
+}
+.info-title-link:hover{
+  background:var(--primary, #6366f1); color:#fff;
+  border-color:var(--primary, #6366f1);
+}
 
 /* =========================================================
    COPIE D'UNE CELLULE VERS D'AUTRES LIGNES (espace prof)

@@ -21,7 +21,7 @@
     '<span class="mq-acts">' +
       '<button type="button" class="mq-act" data-mq-act="edit" data-act-id="' + esc(id) + '" title="Éditer ce module">✎</button>' +
       (withContents
-        ? '<button type="button" class="mq-act" data-mq-act="contents" data-act-id="' + esc(id) + '" title="Éditer les contenus, ligne par ligne">📝</button>'
+        ? '<button type="button" class="mq-act" data-mq-act="contents" data-act-id="' + esc(id) + '" title="Éditer le contenu du panneau d\'information">📝</button>'
         : '') +
       '<button type="button" class="mq-act" data-mq-act="view" data-act-id="' + esc(id) + '" title="Visualiser les contenus">📄</button>' +
       (withColor
@@ -439,8 +439,9 @@
     const mainRow = '<div class="mq-main">' +
       (beside ? '' : leftZone) + columnsZone + (beside ? '' : rightZone) + '</div>';
     const besideRow = '<div class="mq-beside-row">' +
+      leftZone +
       (draft.poolsSide === 'top' ? poolsZone('pools-top', 'top') : poolsZone('pools-bottom', 'bottom')) +
-      leftZone + rightZone + '</div>';
+      rightZone + '</div>';
 
     $('#mq-preview').innerHTML =
       '<div class="mq-screen" style="' + esc(style) + '">' +
