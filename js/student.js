@@ -433,7 +433,9 @@ function startVisualDrag(e) {
     img.style.pointerEvents = 'none';
   }
 
-  ghost.style.width = rect.width + 'px';
+  // Fantôme borné : même quand l'objet occupe toute la ligne,
+  // la miniature reste manipulable.
+  ghost.style.width = Math.min(rect.width, 280) + 'px';
   ghost.style.height = rect.height + 'px';
 
   document.body.appendChild(ghost);
