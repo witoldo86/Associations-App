@@ -48,7 +48,9 @@
       if (cfg.layout.poolsSide !== 'bottom') cfg.layout.poolsSide = 'top';
       cfg.theme = App.theme.resolve(cfg.theme);
 
-      const rich = cfg.modules.filter((m) => m.kind === 'richtext');
+      // Textes enrichis : cartels, plus les présentations des son/vidéo/page web
+      const rich = cfg.modules.filter((m) =>
+        m.kind === 'richtext' || m.kind === 'audio' || m.kind === 'video' || m.kind === 'url');
       this.data.rows.forEach((r) => {
         if (!r.cells || typeof r.cells !== 'object') r.cells = {};
         cfg.modules.forEach((m) => {
@@ -94,6 +96,20 @@
     updateRow(id, cells) {
       const r = this.data.rows.find((x) => String(x.id) === String(id));
       if (r) { Object.assign(r.cells, cells); this._touch(); this.persist(); }
+    },
+    /** Mise à jour groupée : [{ id, cells }] — un seul enregistrement/rendu. */
+    updateRowsBulk(list) {
+      let touched = false;
+      if (!Array.isArray(list)) return;
+      list.forEach((u) => {
+        if (!u) return;
+        const r = this.data.rows.find((x) => String(x.id) === String(u.id));
+        if (r && u.cells && typeof u.cells === 'object') {
+          Object.assign(r.cells, u.cells);
+          touched = true;
+        }
+      });
+      if (touched) { this._touch(); this.persist(); }
     },
     /** Réordonne les lignes selon une liste d'identifiants (ignorée si incomplète). */
     reorderRows(ids) {

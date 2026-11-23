@@ -169,6 +169,17 @@
       return url != null ? url : '';
     },
 
+    /* URL «blob:» (remise par resolve) → référence «media:<clé>»,
+       si le magasin connaît cette URL ; sinon null.
+       Utilisé pour récupérer les images insérées par l'éditeur riche. */
+    reverse(url) {
+      if (typeof url !== 'string' || typeof URL === 'undefined' ||
+          url.indexOf('blob:') !== 0) return null;
+      let found = null;
+      urls.forEach((u, k) => { if (!found && u === url) found = PREFIX + k; });
+      return found;
+    },
+
     /* Déplace les sources « data: » intégrées aux cellules vers le
        magasin ; renvoie true si au moins une cellule a été allégée.
        Les cellules ne sont modifiées qu'après enregistrement réussi. */
