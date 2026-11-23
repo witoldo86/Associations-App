@@ -128,11 +128,7 @@
       return `
         <div class="pool-col">
           <h3 class="pool-title">
-            <button type="button" class="module-nav" data-nav-dir="prev"
-              aria-label="Module précédent" title="Module précédent">‹</button>
             <span>${esc(modLabel(m))}</span>
-            <button type="button" class="module-nav" data-nav-dir="next"
-              aria-label="Module suivant" title="Module suivant">›</button>
             <button type="button" class="module-preview-open"
               data-preview-module="${esc(m.id)}"
               aria-label="Agrandir le module ${esc(modLabel(m))}"
@@ -144,6 +140,10 @@
             </button>
           </h3>
           <div class="pool${m.poolCols ? ' is-gridded' : ''}${m.poolColor ? ' has-color' : ''}" data-pool-module="${esc(m.id)}" id="pool-${esc(m.id)}"${poolStyle ? ' style="' + poolStyle + '"' : ''}></div>
+          <button type="button" class="module-nav" data-nav-dir="prev"
+            aria-label="Module précédent" title="Module précédent">‹</button>
+          <button type="button" class="module-nav" data-nav-dir="next"
+            aria-label="Module suivant" title="Module suivant">›</button>
         </div>`;
     };
     const poolsInner = poolPlan.lines > 1
@@ -454,6 +454,14 @@ function onPointerMove(e) {
 function startVisualDrag(e) {
   const rect = drag.itemEl.getBoundingClientRect();
 
+  // Le fantôme ne doit jamais dépasser la largeur du panneau qui
+  // accueillera l'élément (case du plateau) : même quand une réserve
+  // n'a plus qu'un ou deux objets immenses, il reste manipulable
+  // et le pointeur reste bien dessus.
+  const slot = root.querySelector('.slot[data-slot-module="' + cssId(board.items[drag.key].moduleId) + '"]');
+  const slotW = slot ? slot.getBoundingClientRect().width : 0;
+  const ghostW = Math.min(rect.width, 280, slotW > 40 ? slotW : Infinity);
+
   const ghost = drag.itemEl.cloneNode(true);
   ghost.classList.add('item-ghost');
 
@@ -470,13 +478,15 @@ function startVisualDrag(e) {
 
   // Fantôme borné : même quand l'objet occupe toute la ligne,
   // la miniature reste manipulable.
-  ghost.style.width = Math.min(rect.width, 280) + 'px';
+  ghost.style.width = ghostW + 'px';
   ghost.style.height = rect.height + 'px';
 
   document.body.appendChild(ghost);
 
-  drag.offsetX = drag.startX - rect.left;
-  drag.offsetY = drag.startY - rect.top;
+  // Le point du fantôme qui suit la souris est borné au fantôme :
+  // sur un bouton géant, le pointeur ne « décolle » plus de la vignette.
+  drag.offsetX = Math.min(Math.max(drag.startX - rect.left, 0), Math.max(0, ghostW - 12));
+  drag.offsetY = Math.min(Math.max(drag.startY - rect.top, 0), Math.max(0, rect.height - 12));
   drag.ghost = ghost;
   drag.dragging = true;
 
