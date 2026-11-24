@@ -319,8 +319,9 @@
     const revealBlock = isInfo
       ? `<fieldset class="module-fieldset">
           <legend>Apparition du panneau (optionnel)</legend>
-          <div class="hint" style="margin-bottom:.3rem">Le panneau d'information apparaît dès que l'élève complète
-            l'une des lignes cochées, et/ou après avoir consulté les éléments des modules
+          <div class="hint" style="margin-bottom:.3rem">Le panneau d'information apparaît dès que l'élève a correctement assemblé
+            autant de lignes que de lignes cochées ici — n'importe lesquelles : dès que l'agencement
+            d'une ligne est bon, cela compte. Et/ou après avoir consulté les éléments des modules
             cochés dans le « Verrouillage pédagogique » ci-dessus. Sans coche : visible dès le début.
             ${rowList.length ? '' : 'Créez d’abord des lignes pour pouvoir les cocher.'}</div>
           <div class="inline">

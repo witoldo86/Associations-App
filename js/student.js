@@ -348,10 +348,23 @@
     balancePools();
   }
 
-  /* Ligne du plateau complétée : chaque module à associer y a un élément déposé. */
-  function boardRowComplete(rowIndex) {
-    return assocMods().every((m) =>
-      (board.keys[m.id] || []).some((k) => board.placement[k] === rowIndex));
+  /* Ligne correctement assemblée : chaque module à associer a un élément
+     déposé sur la ligne, et c'est le bon (celui attendu pour cette ligne). */
+  function boardRowCorrect(rowIndex) {
+    const r = App.state.rows()[rowIndex];
+    if (!r) return false;
+    return assocMods().every((m) => {
+      const key = occupantOf(m.id, rowIndex);
+      return !!key && String(board.items[key].rowId) === String(r.id);
+    });
+  }
+
+  /* Nombre de lignes correctement assemblées, n'importe lesquelles. */
+  function boardCorrectRows() {
+    const rows = App.state.rows();
+    let ok = 0;
+    for (let i = 0; i < rows.length; i++) if (boardRowCorrect(i)) ok++;
+    return ok;
   }
 
   /* Contenu du panneau : valide s'il est défini (un seul contenu par module). */
@@ -378,17 +391,15 @@
     });
   }
 
-  /* Condition d'apparition d'un module informatif : lignes complétées
-     (au choix du prof) et/ou éléments consultés. Sans condition : toujours. */
+  /* Condition d'apparition d'un module informatif : lignes assemblées
+     CORRECTEMENT (n'importe lesquelles — autant que de lignes cochées par
+     le prof) et/ou éléments consultés. Sans condition : toujours. */
   function infoVisible(m) {
     if (!infoDepsViewed(m)) return false;
     const reveal = Array.isArray(m.revealRows) ? m.revealRows : [];
     if (!reveal.length) return true;
-    const rows = App.state.rows();
-    return reveal.some((rid) => {
-      const i = rows.findIndex((x) => String(x.id) === String(rid));
-      return i >= 0 && boardRowComplete(i);
-    });
+    const need = new Set(reveal.map(String)).size;
+    return boardCorrectRows() >= need;
   }
 
   function renderInfoSidebars() {
