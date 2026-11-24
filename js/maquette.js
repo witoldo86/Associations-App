@@ -215,6 +215,14 @@
       else if (act.dataset.mqAct === 'del') A.removeModule(id);
       return;
     }
+    const tog = e.target.closest('[data-drawer-toggle]');
+    if (tog) {
+      e.preventDefault();
+      e.stopPropagation();
+      const z = tog.dataset.drawerToggle;
+      if (z) { drawerOpen[z] = !drawerOpen[z]; renderPreview(); }
+      return;
+    }
     const sh = e.target.closest('[data-mq-shuffle]');
     if (sh) {
       e.preventDefault();
@@ -324,6 +332,30 @@
       '</div>';
   }
 
+  /* Tiroirs repliables des panneaux gauche/droit : même structure de zone
+     (mq-zone mq-side + data-zone) pour le dépôt, mais le corps se replie.
+     État de session uniquement : fermés au chargement de la page. */
+  const drawerOpen = { left: false, right: false };
+
+  function sideDrawerHtml(name, title) {
+    const mods = draft.modules.filter((m) => m.role === 'informative' && m.zone === name);
+    const open = !!drawerOpen[name];
+    const plus = ADD_ZONE[name]
+      ? '<button type="button" class="mq-add" data-mq-add="' + ADD_ZONE[name] + '" title="Ajouter un module">＋</button>' : '';
+    return '<div class="mq-zone mq-side mq-drawer ' + (open ? 'is-open' : 'is-closed') + '" data-zone="' + name + '">' +
+      '<div class="mq-drawer-head-row">' +
+        '<button type="button" class="mq-drawer-head" data-drawer-toggle="' + name + '" aria-expanded="' + open + '">' +
+          '<span class="mq-drawer-chevron" aria-hidden="true">' + (open ? '\u25bd' : '\u25b7') + '</span>' +
+          '<span class="mq-drawer-title">' + esc(title) + '</span>' +
+          '<span class="mq-drawer-count" title="Modules dans ce panneau">' + mods.length + '</span>' +
+        '</button>' + plus +
+      '</div>' +
+      '<div class="mq-drawer-body"' + (open ? '' : ' hidden') + '>' +
+        (mods.length ? mods.map(moduleChip).join('') : '<span class="mq-empty">Déposez ici</span>') +
+      '</div>' +
+      '</div>';
+  }
+
   function rowChips() {
     const rows = App.state.rows();
     const byId = new Map(rows.map((r) => [String(r.id), r]));
@@ -394,7 +426,7 @@
     const poolsOneLine = !pc;
     const miniChip = (m, flex) => {
       const st = [
-        flex ? 'flex-grow:' + poolSpanOf(m) + ';flex-basis:0;min-width:0' : '',
+        flex ? 'flex-grow:' + poolSpanOf(m) + ';flex-basis:0' : '',
         m.poolColor ? 'background:' + esc(m.poolColor) : ''
       ].filter(Boolean).join(';');
       return '<span class="mq-mini" data-drag-kind="module" data-drag-id="' + esc(m.id) +
@@ -405,8 +437,10 @@
     let poolsInner;
     let poolsMiniAttr = '';
     if (poolsOneLine) {
+      const n = assoc.length;
+      const fair = n > 1 ? 'calc((100% - ' + (9 * (n - 1)) + 'px)/' + n + ')' : '100%';
       const poolParts = [];
-      assoc.forEach((m, i) => { if (i) poolParts.push('9px'); poolParts.push('minmax(0,' + poolSpanOf(m) + 'fr)'); });
+      assoc.forEach((m, i) => { if (i) poolParts.push('9px'); poolParts.push('minmax(min(190px,' + fair + '),' + poolSpanOf(m) + 'fr)'); });
       poolsInner = assoc.map((m) => miniChip(m, false)).join(RESIZER);
       poolsMiniAttr = ' style="grid-template-columns:' + poolParts.join(' ') + '"';
     } else {
@@ -437,8 +471,8 @@
        choix du prof dans la fenêtre Grille. */
     const asideMode = draft.infosAside === 'both' ? 'both'
       : (draft.infosAside === 'pools' || draft.infosBesidePools) ? 'pools' : 'board';
-    const leftZone = zoneHtml('left', 'Panneau gauche', inZone('left').map(moduleChip).join(''), 'mq-side');
-    const rightZone = zoneHtml('right', 'Panneau droit', inZone('right').map(moduleChip).join(''), 'mq-side');
+    const leftZone = sideDrawerHtml('left', 'Panneau gauche');
+    const rightZone = sideDrawerHtml('right', 'Panneau droit');
     const columnsZone = zoneHtml('columns', 'Plateau — colonnes à associer (dans l\'ordre)',
       boardInner, 'mq-board', '', GRID_BTN);
     const mainRow = '<div class="mq-main">' +
@@ -466,7 +500,7 @@
                 : poolsZone('pools-top', 'top') + mainRow + besideRow)
             : poolsZone('pools-top', 'top') + mainRow + poolsZone('pools-bottom', 'bottom')) +
       '</div>' +
-      zoneHtml('hidden', 'Modules masqués (non affichés à l\'élève)', inZone('hidden').map(moduleChip).join(''), 'mq-hidden') +
+      zoneHtml('hidden', 'Modules masqués (non affichés à l\'élève)', inZone('hidden').map(moduleChip).join(''), 'mq-hidden mq-cards') +
       zoneHtml('rows', 'Ordre des lignes', rowChips(), 'mq-rows', '', SHUFFLE_BTN);
   }
 
