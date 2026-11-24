@@ -348,23 +348,16 @@
     balancePools();
   }
 
-  /* Ligne correctement assemblée : chaque module à associer a un élément
-     déposé sur la ligne, et c'est le bon (celui attendu pour cette ligne). */
-  function boardRowCorrect(rowIndex) {
-    const r = App.state.rows()[rowIndex];
-    if (!r) return false;
+  /* Agencement exact d'une ligne de référence réalisé sur la ligne du
+     plateau d'index i : chaque module à associer a un élément déposé,
+     et tous ces éléments appartiennent à cette même ligne de référence.
+     La position n'importe pas : l'élève peut réaliser cet agencement sur
+     n'importe quelle ligne du plateau. */
+  function rowArrangementPresent(rowIndex, rowId) {
     return assocMods().every((m) => {
       const key = occupantOf(m.id, rowIndex);
-      return !!key && String(board.items[key].rowId) === String(r.id);
+      return !!key && String(board.items[key].rowId) === String(rowId);
     });
-  }
-
-  /* Nombre de lignes correctement assemblées, n'importe lesquelles. */
-  function boardCorrectRows() {
-    const rows = App.state.rows();
-    let ok = 0;
-    for (let i = 0; i < rows.length; i++) if (boardRowCorrect(i)) ok++;
-    return ok;
   }
 
   /* Contenu du panneau : valide s'il est défini (un seul contenu par module). */
@@ -391,15 +384,17 @@
     });
   }
 
-  /* Condition d'apparition d'un module informatif : lignes assemblées
-     CORRECTEMENT (n'importe lesquelles — autant que de lignes cochées par
-     le prof) et/ou éléments consultés. Sans condition : toujours. */
+  /* Condition d'apparition d'un module informatif : l'agencement exact des
+     éléments de l'UNE des lignes pointées par le prof est réalisé par
+     l'élève — sur n'importe quelle ligne du plateau — et/ou éléments
+     consultés. Sans condition : toujours. */
   function infoVisible(m) {
     if (!infoDepsViewed(m)) return false;
     const reveal = Array.isArray(m.revealRows) ? m.revealRows : [];
     if (!reveal.length) return true;
-    const need = new Set(reveal.map(String)).size;
-    return boardCorrectRows() >= need;
+    const rows = App.state.rows();
+    return reveal.some((rid) =>
+      rows.some((_, i) => rowArrangementPresent(i, rid)));
   }
 
   function renderInfoSidebars() {

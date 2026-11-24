@@ -308,20 +308,24 @@
     const isInfo = isNew ? presetRole === 'informative' : m.role === 'informative';
     const rowList = isNew || isInfo ? App.state.rows() : [];
     const revealSet = new Set((m && Array.isArray(m.revealRows)) ? m.revealRows.map(String) : []);
-    const firstAssoc = allMods().find((x) => x.role === 'associate');
+    const assocAll = allMods().filter((x) => x.role === 'associate');
+    /* Le prof pointe un agencement : on montre TOUS les blocs de la ligne. */
     const rowLabelOf = (r, i) => {
-      let txt = '';
-      const vt = firstAssoc && App.schema.Types[firstAssoc.kind];
-      if (vt && r.cells && r.cells[firstAssoc.id] != null) txt = String(vt.summary(r.cells[firstAssoc.id]) || '');
-      if (txt.length > 30) txt = txt.slice(0, 30) + '…';
-      return 'Ligne ' + (i + 1) + (txt ? ' — ' + txt : ' (vide)');
+      const parts = assocAll.map((mm) => {
+        const vt = App.schema.Types[mm.kind];
+        if (!vt || !r.cells || r.cells[mm.id] == null) return '';
+        let s = String(vt.summary(r.cells[mm.id]) || '');
+        if (s.length > 20) s = s.slice(0, 20) + '…';
+        return s;
+      }).filter(Boolean);
+      return 'Ligne ' + (i + 1) + (parts.length ? ' — ' + parts.join(' · ') : ' (vide)');
     };
     const revealBlock = isInfo
       ? `<fieldset class="module-fieldset">
           <legend>Apparition du panneau (optionnel)</legend>
-          <div class="hint" style="margin-bottom:.3rem">Le panneau d'information apparaît dès que l'élève a correctement assemblé
-            autant de lignes que de lignes cochées ici — n'importe lesquelles : dès que l'agencement
-            d'une ligne est bon, cela compte. Et/ou après avoir consulté les éléments des modules
+          <div class="hint" style="margin-bottom:.3rem">Le panneau d'information apparaît dès que l'élève a réalisé, sur n'importe
+            quelle ligne du plateau, l'agencement exact des éléments de l'une des lignes cochées ici.
+            Et/ou après avoir consulté les éléments des modules
             cochés dans le « Verrouillage pédagogique » ci-dessus. Sans coche : visible dès le début.
             ${rowList.length ? '' : 'Créez d’abord des lignes pour pouvoir les cocher.'}</div>
           <div class="inline">
