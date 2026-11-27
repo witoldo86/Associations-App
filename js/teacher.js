@@ -1774,11 +1774,22 @@ function applyRteLineHeight(editor, lineHeightVal) {
     const li = e.target.closest('li[data-row-id]');
     if (!li) return;
     const id = li.dataset.rowId;
-    selectedRowId = (String(selectedRowId) === String(id)) ? null : id;
-    renderRows();
+    /* Différer la sélection : si le rendu était immédiat, le premier clic
+       reconstruisait la liste et l'élément disparaissait avant le second
+       clic — le double-clic n'arrivait jamais (constat prof : double-clic
+       sans effet sur les lignes compactes). */
+    clearTimeout(rowClickTimer);
+    rowClickTimer = setTimeout(() => {
+      selectedRowId = (String(selectedRowId) === String(id)) ? null : id;
+      renderRows();
+    }, 260);
   }
 
+  /* Minuteur du clic simple sur une ligne (annulé par le double-clic). */
+  let rowClickTimer = 0;
+
   function onRowListDblClick(e) {
+    clearTimeout(rowClickTimer);
     if (e.target.closest('button[data-row-act]')) return;
     if (e.target.closest('.cell-box[data-module-id], .syn-cell[data-module-id]')) return;
     const li = e.target.closest('li[data-row-id]');
