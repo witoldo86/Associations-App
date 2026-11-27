@@ -1420,7 +1420,18 @@ body.student-mode #s-pools-zone .pool-col.is-expanded .item-image img{
 /* =========================================================
    VUE SYNTHÉTIQUE DES LIGNES (espace prof)
    ========================================================= */
+/* Vue synthétique : les lignes s'organisent sur PLUSIEURS COLONNES
+   (autant que la place le permet, selon la largeur des modules) pour
+   voir d'un coup d'œil toutes les lignes de l'exercice. */
+.triplet-list.rows-compact{
+  display:grid; grid-template-columns:repeat(auto-fill, minmax(320px, 1fr));
+  gap:.6rem; align-items:start;
+}
+.rows-compact .triplet-item{ padding:.35rem .5rem; }
 .rows-compact .row-cells{ gap:.5rem; flex-wrap:wrap; }
+@media (max-width:480px){
+  .triplet-list.rows-compact{ grid-template-columns:1fr; }
+}
 .rows-compact .syn-cell{
   display:inline-flex; align-items:center; gap:.45rem; max-width:260px;
   border:1px solid var(--line); border-radius:8px; background:#fff;
