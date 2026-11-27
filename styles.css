@@ -134,20 +134,11 @@ input:focus,textarea:focus{ outline:2px solid #bfdbfe; border-color:var(--primar
   font:inherit; font-size:.82rem; cursor:pointer;
 }
 .rte-select:hover{ background:#eef2ff; }
-.rte-student-preview{
-  margin-left:auto; width:auto; padding:0 .55rem; font-size:.85rem;
-}
-.student-preview-surface{
-  border:1px dashed #cbd5e1;
-  border-radius:8px;
-  padding:.5rem .65rem;
-  background:#fff;
-  min-height:140px;
-  outline:none;
-}
-.student-preview-surface:focus{
-  border-color:var(--primary);
-}
+
+/* Aperçu élève (œil unique d'un module enrichi) : calque au-dessus du
+   formulaire d'édition, mêmes classes que la fenêtre de lecture réelle. */
+#reading-preview-root .reading-preview-backdrop{ z-index:950; }
+#reading-preview-root .modal{ width:min(720px,92vw); }
 
 /* Liste des associations */
 .triplet-list{ list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:.6rem; }
@@ -289,6 +280,10 @@ body.student-mode .item-text>span{ max-width:100%; }
   padding:.4rem; background:#fafbfc; transition:border-color .2s, background .2s;
 }
 .slot.drop-hover{ border-color:var(--primary); background:#eff6ff; }
+/* Mesure (textes enrichis sur le plateau) : sortir le contenu du flux pour
+   connaître la hauteur naturelle de la ligne, puis borner la case. */
+.slot-noflow{ position:relative; }
+.slot-noflow > .item{ position:absolute; top:0; left:0; right:0; visibility:hidden; }
 .slot-hint{ color:#b6bfcc; font-size:.8rem; }
 .slot > .item{ width:100%; max-width:100%; }
 .slot > .item-image{ height:84px; }
@@ -583,6 +578,20 @@ body.student-mode .row{ grid-template-columns:var(--cols-tpl,repeat(var(--cols,3
   margin:.4rem 0 .3rem; font-size:.85rem; text-transform:uppercase;
   letter-spacing:.05em; color:var(--muted);
 }
+/* Disposition des modules d'info dans le panneau (Grille des modules) :
+   2 ou 3 par ligne au lieu d'un par ligne (défaut = empilés). */
+.info-sidebar[data-cols="2"],
+.info-sidebar[data-cols="3"]{
+  display:grid; align-content:start; gap:.5rem;
+}
+.info-sidebar[data-cols="2"]{ grid-template-columns:repeat(2, minmax(0, 1fr)); }
+.info-sidebar[data-cols="3"]{ grid-template-columns:repeat(3, minmax(0, 1fr)); }
+.info-sidebar[data-cols="2"] .info-module,
+.info-sidebar[data-cols="3"] .info-module{ margin:0; }
+.info-sidebar[data-cols="2"] .info-module .item,
+.info-sidebar[data-cols="3"] .info-module .item{ margin:0; }
+.info-sidebar[data-cols="2"] .info-title-link,
+.info-sidebar[data-cols="3"] .info-title-link{ width:auto; }
 .info-module .item{
   cursor:default; box-shadow:none; margin-bottom:.4rem;
 }

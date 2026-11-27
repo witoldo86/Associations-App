@@ -128,7 +128,7 @@
     let resizeTimer = 0;
     window.addEventListener('resize', () => {
       clearTimeout(resizeTimer);
-      resizeTimer = setTimeout(balancePools, 150);
+      resizeTimer = setTimeout(() => { balancePools(); fitRichSlots(); }, 150);
     });
   }
 
@@ -486,6 +486,7 @@
     boardEl.style.setProperty('--cols-tpl', boardPlan.tpl);
     boardEl.innerHTML = html;
     balancePools();
+    fitRichSlots();
 
     checkCompletions();
   }
@@ -583,6 +584,10 @@
 
   function renderInfoSidebars() {
     const infos = infoMods().filter((m) => infoVisible(m) && infoDataOf(m));
+    /* Disposition choisie par le prof (Grille des modules) : 1 = empilés
+       (défaut), 2 ou 3 = N modules d'info par ligne dans le panneau. */
+    const icRaw = Number(cfg().layout && cfg().layout.infoCols);
+    const infoCols = (icRaw === 2 || icRaw === 3) ? icRaw : 1;
 
     [['left', $('#s-info-left')], ['right', $('#s-info-right')]].forEach(([side, el]) => {
       const html = infos.filter((m) => m.zone === side).map((m) => {
@@ -603,6 +608,7 @@
           '" role="button" tabindex="0" title="Afficher en grand">' + rendered + '</div>';
       }).join('');
       el.innerHTML = html;
+      el.dataset.cols = String(infoCols);
       el.hidden = !html;
     });
   }
@@ -746,6 +752,55 @@
     const col = zone.querySelector('.pool-col.is-expanded');
     if (col) col.style.maxHeight = Math.max(180, Math.floor(zone.clientHeight - 8)) + 'px';
     else zone.querySelectorAll('.pool-col').forEach((c) => { c.style.maxHeight = ''; });
+  }
+
+  /* Textes enrichis déposés sur le plateau : la case garde la taille qu'elle
+     aurait SANS le texte long — c'est le TEXTE qui rétrécit (zoom
+     progressif) pour que la même quantité d'infos reste visible, en plus
+     petit. Hauteur de référence = les autres cases de la ligne (ou la
+     hauteur standard d'une case vide). */
+  function fitRichSlots() {
+    document.querySelectorAll('#board .row').forEach((row) => {
+      const slots = [...row.querySelectorAll('.slot')];
+      const richSlots = slots.filter((s) => s.querySelector('.item[data-item-type="richtext"]'));
+      if (!richSlots.length) return;
+
+      /* Repartir de zéro : annuler les bornes posées au rendu précédent. */
+      slots.forEach((s) => { s.style.height = ''; });
+      richSlots.forEach((s) => {
+        const it = s.querySelector('.item[data-item-type="richtext"]');
+        if (it) { it.style.zoom = ''; it.style.height = ''; it.style.overflow = ''; }
+      });
+
+      /* Mesurer la hauteur de référence : le contenu riche est sorti du flux
+         pendant la mesure pour ne pas gonfler la ligne. */
+      richSlots.forEach((s) => s.classList.add('slot-noflow'));
+      const others = slots.filter((s) => !s.classList.contains('slot-noflow'));
+      let base;
+      if (others.length) {
+        base = Math.max.apply(null, others.map((s) => s.offsetHeight));
+      } else {
+        base = Math.max.apply(null, richSlots.map((s) => s.offsetHeight));
+      }
+      base = Math.max(base, 88);   // hauteur minimale d'une case (.slot)
+
+      richSlots.forEach((s) => {
+        s.classList.remove('slot-noflow');
+        s.style.height = base + 'px';
+        const it = s.querySelector('.item[data-item-type="richtext"]');
+        if (!it) return;
+        it.style.height = '100%';
+        it.style.overflow = 'hidden';
+        let guard = 26;
+        while (it.scrollHeight > it.clientHeight + 1 && guard > 0) {
+          const z = parseFloat(it.style.zoom || '1');
+          const next = Math.max(0.45, z * 0.92);
+          if (next === z) break;
+          it.style.zoom = String(next);
+          guard--;
+        }
+      });
+    });
   }
 
   /* =========================================================
@@ -970,6 +1025,7 @@ function refreshDropDisplay(moduleId, rowIndex, previousRow) {
     slot.innerHTML = key ? itemHtml(key) : slotHint(m);
   });
 
+  fitRichSlots();
   updateSaveButton();
   renderInfoSidebars();
 }

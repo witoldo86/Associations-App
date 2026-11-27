@@ -156,11 +156,17 @@
             '<select id="gd-board">' + opts(gridNLocal(l.boardCols)) + '</select></div>' +
           '<div class="field"><label for="gd-pools">Réserves : modules par ligne</label>' +
             '<select id="gd-pools">' + opts(gridNLocal(l.poolsCols)) + '</select></div>' +
-          '<div class="field"><label for="gd-infos">Panneaux d\'information (gauche / droite)</label>' +
+          '<div class="field"><label for="gd-infos">Panneaux d\'information — position</label>' +
             '<select id="gd-infos">' +
               '<option value="board"' + (asideModeLocal(l) === 'board' ? ' selected' : '') + '>À gauche et à droite du plateau (défaut)</option>' +
               '<option value="pools"' + (asideModeLocal(l) === 'pools' ? ' selected' : '') + '>À gauche et à droite des réserves</option>' +
               '<option value="both"' + (asideModeLocal(l) === 'both' ? ' selected' : '') + '>Pleine hauteur — à côté des réserves et du plateau</option>' +
+            '</select></div>' +
+          '<div class="field"><label for="gd-infocols">Panneaux d\'information — modules par ligne</label>' +
+            '<select id="gd-infocols">' +
+              '<option value="1"' + (!l.infoCols || l.infoCols <= 1 ? ' selected' : '') + '>Empilés — un par ligne (défaut)</option>' +
+              '<option value="2"' + (l.infoCols === 2 ? ' selected' : '') + '>2 par ligne</option>' +
+              '<option value="3"' + (l.infoCols === 3 ? ' selected' : '') + '>3 par ligne</option>' +
             '</select></div>' +
           '<div class="field"><label for="gd-rewards">Récompenses visuelles (feux d’artifice)</label>' +
             '<select id="gd-rewards">' +
@@ -184,6 +190,10 @@
         poolsCols: gridNLocal(document.getElementById('gd-pools').value),
         infosAside: document.getElementById('gd-infos').value,
         infosBesidePools: document.getElementById('gd-infos').value === 'pools',
+        infoCols: (function () {
+          const n = Number(document.getElementById('gd-infocols').value);
+          return (n === 2 || n === 3) ? n : 1;
+        })(),
         rewards: (function () {
           const el = document.getElementById('gd-rewards');
           const v = el ? el.value : 'off';
@@ -1046,10 +1056,19 @@ function onToggleFlattenAll() {
     const type = App.schema.Types[m.kind];
     const fields = type.formSchema(value || type.createEmpty());
     const key = idKey || m.id;
+    /* Texte enrichi : UN SEUL bouton œil, en bas du formulaire — il montre
+       la fenêtre de lecture telle que l'élève la verra (titre + contenu
+       mis en forme). Les œils de la barre d'outils ont été retirés. */
+    const preview = m.kind === 'richtext'
+      ? `<div class="form-actions">
+           <button type="button" class="btn" data-richtext-preview="${esc(m.id)}"
+                   title="Montrer la fenêtre de lecture vue par l'élève">👁 Aperçu élève</button>
+         </div>` : '';
     return `
       <fieldset class="module-fieldset" data-module="${esc(m.id)}">
         <legend>${esc(m.label || m.id)} <span class="badge">${esc(type.label)}</span></legend>
         ${fields.map((f) => renderField(key, f)).join('')}
+        ${preview}
       </fieldset>`;
   }
 
@@ -1204,7 +1223,6 @@ function onToggleFlattenAll() {
               <span class="rte-sep"></span>
               <button type="button" class="rte-btn" data-action="rte-image" title="Insérer une image">🖼</button>
               <button type="button" class="rte-btn" data-cmd="clear" title="Effacer la mise en forme">✕</button>
-              <button type="button" class="rte-btn rte-student-preview" data-action="student-preview" title="Voir / éditer tel que vu par l'élève">👁</button>
             </div>`;
   }
 
@@ -1213,6 +1231,14 @@ function onToggleFlattenAll() {
   }
 
   function bindFieldEvents(formEl) {
+    /* Fiabilité des outils : le clic sur un bouton de la barre ne fait PAS
+       sortir le focus de l'éditeur (sinon la sélection était perdue et la
+       mise en forme s'appliquait au mauvais passage — comportement
+       erratique signalé par le prof). */
+    formEl.addEventListener('mousedown', (e) => {
+      const btn = e.target.closest('.rte-btn');
+      if (btn) e.preventDefault();
+    });
     formEl.addEventListener('click', (e) => {
       const imgBtn = e.target.closest('[data-action="rte-image"]');
       if (imgBtn) {
@@ -1222,12 +1248,18 @@ function onToggleFlattenAll() {
         if (rteEl) pickAndInsertImage(rteEl.querySelector('.rte-editor'));
         return;
       }
-      const previewBtn = e.target.closest('[data-action="student-preview"]');
-      if (previewBtn) {
+      /* 👁 Aperçu élève (un seul par module enrichi, en bas du formulaire) :
+         montre la fenêtre de lecture TELLE QUE L'ÉLÈVE la verra en cliquant
+         sur le module — titre et contenu mis en forme, bandeau coloré. */
+      const prevBtn = e.target.closest('[data-richtext-preview]');
+      if (prevBtn) {
         e.preventDefault();
-        e.stopPropagation();
-        const rteEl = previewBtn.closest('.rte');
-        if (rteEl) openStudentTextPreview(rteEl);
+        const fs = prevBtn.closest('.module-fieldset');
+        const m = fs && allMods().find((x) => String(x.id) === String(fs.dataset.module));
+        if (m && m.kind === 'richtext') {
+          const v = App.schema.buildPayload(m.kind, collectFields(m.kind, m.id));
+          openReadingPreview(m, v);
+        }
         return;
       }
       /* ✓ Appliquer : AVANT la branche générique .rte-btn (le bouton porte
@@ -1398,11 +1430,16 @@ function onToggleFlattenAll() {
       r = document.createRange();
       r.selectNodeContents(editor);
     }
+    const sel = window.getSelection();
     try {
-      const sel = window.getSelection();
       sel.removeAllRanges();
       sel.addRange(r);
     } catch (err) { /* jsdom, etc. */ }
+    if (!sel || !sel.rangeCount) {
+      /* Dernier recours : sélectionner tout le contenu plutôt que de laisser
+         la commande s'appliquer à une sélection vide (réglage sans effet). */
+      try { sel.selectAllChildren(editor); } catch (err2) { /* jsdom, etc. */ }
+    }
     return r;
   }
 
@@ -1490,42 +1527,55 @@ function applyRteLineHeight(editor, lineHeightVal) {
     }
   }
 
-function openStudentTextPreview(rteEl) {
-    const editor = rteEl ? rteEl.querySelector('.rte-editor') : null;
-    if (!editor) return;
-    const rawHtml = editor.innerHTML || '';
-    let currentHtml = (App.utils && typeof App.utils.sanitizeRich === 'function')
-      ? App.utils.sanitizeRich(rawHtml)
-      : rawHtml;
-    if (App.utils && typeof App.utils.resolveMediaInHtml === 'function') {
-      currentHtml = App.utils.resolveMediaInHtml(currentHtml);
+  /* 👁 Aperçu élève : la fenêtre de lecture (celle que l'élève ouvre en
+     cliquant sur le module) avec les valeurs ACTUELLES du formulaire —
+     titre et contenu mis en forme, bandeau coloré. Affichée en calque
+     par-dessus le formulaire d'édition : fermer l'aperçu ne perd aucune
+     modification en cours. */
+  function openReadingPreview(m, value) {
+    const T = App.schema.Types.richtext;
+    const titleHtml = T.modalTitleHtml(value);
+    const titleText = (value && value.title && App.utils.stripHtml(String(value.title))) ||
+      (m.label || 'Texte enrichi');
+    const body = '<div class="modal-rich">' +
+      ((value && value.html) ? App.utils.resolveMediaInHtml(value.html) : '<p class="muted">(Contenu vide)</p>') +
+      '</div>';
+    const tc = (value && typeof value.titleColor === 'string' && /^#[0-9a-fA-F]{3,8}$/.test(value.titleColor))
+      ? ' style="background:' + esc(value.titleColor) + ';color:' + App.utils.contrastText(value.titleColor) +
+        ';border-bottom-color:' + esc(value.titleColor) + '"' : '';
+
+    /* Calque indépendant du modal-root : le formulaire d'édition reste
+       intact dessous (App.modal ne gère qu'une fenêtre à la fois). */
+    let layer = document.getElementById('reading-preview-root');
+    if (!layer) {
+      layer = document.createElement('div');
+      layer.id = 'reading-preview-root';
+      document.body.appendChild(layer);
     }
+    layer.innerHTML =
+      '<div class="modal-backdrop reading-preview-backdrop">' +
+        '<div class="modal" role="dialog" aria-modal="true">' +
+          '<div class="modal-head"' + tc + '>' +
+            '<h3>' + (titleHtml || App.utils.escapeHtml(titleText)) + '</h3>' +
+            '<button type="button" class="modal-close" data-preview-close aria-label="Fermer l\'aperçu">✕</button>' +
+          '</div>' +
+          '<div class="modal-body">' + body + '</div>' +
+        '</div>' +
+      '</div>';
 
-    const fieldset = rteEl.closest('.module-fieldset');
-    const legendEl = fieldset ? fieldset.querySelector('legend') : null;
-    const modTitle = legendEl ? legendEl.firstChild.textContent.trim() : 'Texte enrichi';
-
-    App.modal.open({
-      title: modTitle,
-      html: `
-        <div id="student-live-edit" class="modal-rich student-preview-surface" contenteditable="true">${currentHtml || '<p class="muted">(Texte vide)</p>'}</div>
-        <div class="form-actions" style="margin-top:1rem">
-          <button type="button" class="btn primary" id="apply-student-preview">Appliquer à l'éditeur</button>
-          <button type="button" class="btn" data-close>Fermer</button>
-        </div>`
+    const closeLayer = () => { if (layer) layer.innerHTML = ''; };
+    layer.querySelector('.reading-preview-backdrop').addEventListener('click', (e) => {
+      if (e.target.classList.contains('reading-preview-backdrop') || e.target.hasAttribute('data-preview-close')) {
+        e.stopPropagation();
+        closeLayer();
+      }
     });
-
-    const applyBtn = document.getElementById('apply-student-preview');
-    const liveEdit = document.getElementById('student-live-edit');
-    if (applyBtn && liveEdit) {
-      applyBtn.addEventListener('click', () => {
-        const cleaned = (App.utils && typeof App.utils.sanitizeRich === 'function')
-          ? App.utils.sanitizeRich(liveEdit.innerHTML || '')
-          : (liveEdit.innerHTML || '');
-        editor.innerHTML = cleaned;
-        App.modal.close();
-      });
-    }
+    /* Échap ferme l'APERÇU seulement (pas le formulaire dessous) : la
+       capture bloque la propagation vers le gestionnaire d'App.modal. */
+    const onKey = (e) => {
+      if (e.key === 'Escape') { e.stopPropagation(); closeLayer(); document.removeEventListener('keydown', onKey, true); }
+    };
+    document.addEventListener('keydown', onKey, true);
   }
 
   function onFileField(input, baseId) {
