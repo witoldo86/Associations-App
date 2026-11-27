@@ -162,10 +162,12 @@
               '<option value="pools"' + (asideModeLocal(l) === 'pools' ? ' selected' : '') + '>À gauche et à droite des réserves</option>' +
               '<option value="both"' + (asideModeLocal(l) === 'both' ? ' selected' : '') + '>Pleine hauteur — à côté des réserves et du plateau</option>' +
             '</select></div>' +
-          '<label class="inline" style="gap:.45rem;margin:.35rem 0">' +
-            '<input type="checkbox" id="gd-rewards"' + (l.rewards ? ' checked' : '') + '>' +
-            'Récompenses visuelles : feux d’artifice quand une ligne est complétée' +
-          '</label>' +
+          '<div class="field"><label for="gd-rewards">Récompenses visuelles (feux d’artifice)</label>' +
+            '<select id="gd-rewards">' +
+              '<option value="off"' + (!l.rewards || l.rewards === 'off' || l.rewards === false ? ' selected' : '') + '>Aucune</option>' +
+              '<option value="on"' + (l.rewards === 'on' || l.rewards === true ? ' selected' : '') + '>À chaque ligne complétée (même intensité)</option>' +
+              '<option value="progressive"' + (l.rewards === 'progressive' ? ' selected' : '') + '>Intensité selon la réussite de la combinaison</option>' +
+            '</select></div>' +
           '<p class="hint">Le <strong>plateau</strong> est la zone où l’élève dépose ses réponses ; ' +
             'les <strong>réserves</strong> sont les bacs d’où il pioche les éléments. ' +
             'Dans chaque ligne, les largeurs réglées avec les poignées sont conservées.</p>' +
@@ -182,7 +184,11 @@
         poolsCols: gridNLocal(document.getElementById('gd-pools').value),
         infosAside: document.getElementById('gd-infos').value,
         infosBesidePools: document.getElementById('gd-infos').value === 'pools',
-        rewards: !!(document.getElementById('gd-rewards') && document.getElementById('gd-rewards').checked)
+        rewards: (function () {
+          const el = document.getElementById('gd-rewards');
+          const v = el ? el.value : 'off';
+          return (v === 'on' || v === 'progressive') ? v : 'off';
+        })()
       });
       App.state.updateConfig(c2);
       App.modal.close();
@@ -1232,8 +1238,7 @@ function onToggleFlattenAll() {
         const colorInput = rteEl && rteEl.querySelector('.rte-color-input[data-color="' + applyColorBtn.dataset.applyColor + '"]');
         if (rteEl && colorInput) {
           const editor = rteEl.querySelector('.rte-editor');
-          rteRestoreSelection(editor);
-          document.execCommand(colorInput.dataset.color === 'fore' ? 'foreColor' : 'hiliteColor', false, colorInput.value);
+          rteExec(editor, colorInput.dataset.color === 'fore' ? 'foreColor' : 'hiliteColor', colorInput.value);
         }
         return;
       }
@@ -1241,9 +1246,8 @@ function onToggleFlattenAll() {
       if (btn) {
         e.preventDefault();
         const editor = btn.closest('.rte').querySelector('.rte-editor');
-        rteRestoreSelection(editor);
         const cmd = btn.dataset.cmd;
-        document.execCommand(cmd === 'clear' ? 'removeFormat' : cmd, false, null);
+        rteExec(editor, cmd === 'clear' ? 'removeFormat' : cmd, null);
         return;
       }
       const clearColorBtn = e.target.closest('[data-clear-color]');
@@ -1293,8 +1297,7 @@ function onToggleFlattenAll() {
     formEl.addEventListener('change', (e) => {
       if (e.target.classList && e.target.classList.contains('rte-color-input')) {
         const editor = e.target.closest('.rte').querySelector('.rte-editor');
-        rteRestoreSelection(editor);
-        document.execCommand(e.target.dataset.color === 'fore' ? 'foreColor' : 'hiliteColor', false, e.target.value);
+        rteExec(editor, e.target.dataset.color === 'fore' ? 'foreColor' : 'hiliteColor', e.target.value);
         return;
       }
       if (e.target.id && e.target.id.endsWith('_file')) {
@@ -1357,30 +1360,68 @@ function onToggleFlattenAll() {
     return !!r;
   }
 
-  function applyRteSpanStyle(editor, cssProp, cssVal) {
-    rteRestoreSelection(editor);
+  /* Sélection « utile » dans l'éditeur : sélection live, ou plage
+     sauvegardée (le clic sur un bouton/sélecteur la fait perdre), à
+     condition qu'elle ne soit pas réduite et qu'elle appartienne bien à
+     cet éditeur. Sinon → null. */
+  function rteActiveRange(editor) {
     const sel = window.getSelection();
-    if (!sel || !sel.rangeCount) return;
-    const range = sel.getRangeAt(0);
-    if (!editor.contains(range.commonAncestorContainer)) return;
-
-    if (!cssVal) {
-      document.execCommand('removeFormat', false, null);
-      return;
+    if (sel && sel.rangeCount) {
+      const r = sel.getRangeAt(0);
+      if (!r.collapsed && editor.contains(r.commonAncestorContainer)) return r.cloneRange();
     }
+    const saved = rteRanges.get(editor);
+    if (saved && !saved.collapsed && editor.contains(saved.commonAncestorContainer)) {
+      return saved.cloneRange();
+    }
+    return null;
+  }
 
-    if (range.collapsed) {
-      const span = document.createElement('span');
-      span.style[cssProp] = cssVal;
-      span.appendChild(document.createTextNode('\u200B'));
-      range.insertNode(span);
-      const newRange = document.createRange();
-      newRange.setStart(span.firstChild, 1);
-      newRange.collapse(true);
+  /* Prépare l'outil : focus + sélection utile. SI AUCUN TEXTE N'EST
+     SÉLECTIONNÉ, la plage devient TOUT le contenu de l'éditeur : le
+     réglage (gras, taille, couleur…) s'applique alors à l'ensemble du
+     texte, sans avoir à sélectionner (demande prof). */
+  function rteReadyRange(editor) {
+    rteSelLock = Date.now() + 200;
+    editor.focus();
+    let r = rteActiveRange(editor);
+    if (!r) {
+      r = document.createRange();
+      r.selectNodeContents(editor);
+    }
+    try {
+      const sel = window.getSelection();
       sel.removeAllRanges();
-      sel.addRange(newRange);
-      return;
+      sel.addRange(r);
+    } catch (err) { /* jsdom, etc. */ }
+    return r;
+  }
+
+  /* Mémorise la sélection live d'un éditeur (l'event selectionchange est
+     ignoré pendant le verrou, donc on le fait explicitement). */
+  function rteRemember(editor) {
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount) {
+      const r = sel.getRangeAt(0);
+      if (editor.contains(r.commonAncestorContainer)) rteRanges.set(editor, r.cloneRange());
     }
+  }
+
+  /* Exécute une commande sur l'éditeur : sélection utile (ou tout le
+     texte), commande, puis mémorisation de la sélection résultat. */
+  function rteExec(editor, cmd, val) {
+    rteReadyRange(editor);
+    document.execCommand(cmd, false, val == null ? null : val);
+    rteRemember(editor);
+  }
+
+  function applyRteSpanStyle(editor, cssProp, cssVal) {
+    if (!cssVal) return;
+    /* Sélection utile, ou TOUT le texte si rien n'est sélectionné :
+       choisir une taille/police sans sélection met en forme l'ensemble. */
+    const range = rteReadyRange(editor);
+    if (!range) return;
+    const sel = window.getSelection();
 
     const span = document.createElement('span');
     span.style[cssProp] = cssVal;
@@ -1391,15 +1432,16 @@ function onToggleFlattenAll() {
       span.appendChild(frag);
       range.insertNode(span);
     }
+    /* La sélection reste sur le texte recouvert (elle n'est plus réduite
+       au curseur) : les outils suivants s'appliquent au même passage. */
     sel.removeAllRanges();
     const after = document.createRange();
     after.selectNodeContents(span);
-    after.collapse(false);
     sel.addRange(after);
+    rteRemember(editor);
   }
 
 function applyRteLineHeight(editor, lineHeightVal) {
-    rteRestoreSelection(editor);
     if (!lineHeightVal) {
       editor.style.lineHeight = '';
       editor.querySelectorAll('p, div, li, blockquote').forEach((node) => {
@@ -1408,20 +1450,19 @@ function applyRteLineHeight(editor, lineHeightVal) {
       return;
     }
 
-    const sel = window.getSelection();
+    /* Sélection utile, ou tout le texte si rien n'est sélectionné. */
+    const range = rteReadyRange(editor);
     let appliedToBlock = false;
-    if (sel && sel.rangeCount) {
-      const range = sel.getRangeAt(0);
-      if (editor.contains(range.commonAncestorContainer)) {
-        const blocks = [...editor.querySelectorAll('p, div, li, blockquote')].filter((b) =>
-          range.intersectsNode(b)
-        );
-        if (blocks.length) {
-          blocks.forEach((b) => { b.style.lineHeight = lineHeightVal; });
-          appliedToBlock = true;
-        }
+    if (range && editor.contains(range.commonAncestorContainer)) {
+      const blocks = [...editor.querySelectorAll('p, div, li, blockquote')].filter((b) =>
+        range.intersectsNode(b)
+      );
+      if (blocks.length) {
+        blocks.forEach((b) => { b.style.lineHeight = lineHeightVal; });
+        appliedToBlock = true;
       }
     }
+    rteRemember(editor);
 
     if (!appliedToBlock) {
       let wrapper = editor.querySelector(':scope > p, :scope > div');

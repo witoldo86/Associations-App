@@ -168,9 +168,15 @@
         if (typeof v.titleColor === 'string' && /^#[0-9a-fA-F]{3,8}$/.test(v.titleColor)) {
           out.color = v.titleColor;
         }
-        const st = /style="([^"]*)"/i.exec(String(v.title || ''));
-        if (st) {
-          ['font-size','font-family','font-weight','font-style','line-height','text-align'].forEach((p) => {
+        /* On balaie TOUS les attributs style="…" du titre (le premier
+           élément stylé peut n'être qu'un surlignage, tandis que la
+           taille/police est posée sur un autre passage). */
+        const props = ['font-size','font-family','font-weight','font-style','line-height','text-align'];
+        const stRe = /style="([^"]*)"/gi;
+        let st;
+        while ((st = stRe.exec(String(v.title || ''))) !== null) {
+          props.forEach((p) => {
+            if (p in out) return;
             const mm = new RegExp('(?:^|;)\\s*' + p + '\\s*:\\s*([^;]+)', 'i').exec(st[1]);
             if (mm) out[p] = mm[1].trim();
           });

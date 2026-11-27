@@ -362,14 +362,15 @@
     }
     return el;
   }
-  function fxShow(x, y, big) {
+  function fxShow(x, y, power) {
     const layer = fxLayer();
-    const n = big ? 60 : 30;
+    const p = Math.max(0.15, Math.min(1.6, power == null ? 1 : power));
+    const n = Math.round(10 + 38 * p);
     for (let i = 0; i < n; i++) {
       const s = document.createElement('span');
       s.className = 'fx-spark';
       const ang = Math.random() * Math.PI * 2;
-      const dist = (big ? 90 : 55) + Math.random() * (big ? 130 : 80);
+      const dist = 40 + 55 * p + Math.random() * (30 + 60 * p);
       s.style.left = Math.round(x) + 'px';
       s.style.top = Math.round(y) + 'px';
       s.style.setProperty('--fx-x', Math.round(Math.cos(ang) * dist) + 'px');
@@ -381,16 +382,45 @@
       setTimeout(() => { if (s.parentNode) s.parentNode.removeChild(s); }, 1600);
     }
   }
-  function fxEnabled() {
-    const l = cfg().layout || {};
-    return l.rewards === true;
+  /* Mode de récompense choisi par le prof : 'off' | 'on' | 'progressive'.
+     (Compatibilité : ancien layout.rewards true/false.) */
+  function rewardsMode() {
+    const r = cfg().layout && cfg().layout.rewards;
+    if (r === 'progressive') return 'progressive';
+    if (r === 'on' || r === true) return 'on';
+    return 'off';
   }
-  function celebrateRow(rowEl) {
-    if (!fxEnabled()) return;
+  function fxEnabled() { return rewardsMode() !== 'off'; }
+
+  /* Points gagnés par la combinaison de la ligne : fraction de paires
+     correctes (chaque élément au bon endroit rapporte, selon le barème
+     du prof — paires, pondéré, ou tout-ou-rien). 0 = combinaison fausse. */
+  function rowScoreRatio(rowIndex) {
+    const mods = assocMods();
+    if (!mods.length) return 0;
+    const r = App.state.rows()[rowIndex];
+    if (!r) return 0;
+    let ok = 0;
+    mods.forEach((m) => {
+      const key = occupantOf(m.id, rowIndex);
+      if (key && board.items[key] && String(board.items[key].rowId) === String(r.id)) ok++;
+    });
+    return ok / mods.length;
+  }
+
+  function celebrateRow(rowEl, rowIndex) {
+    const mode = rewardsMode();
+    if (mode === 'off') return;
+    let power = 0.85;                                  // « on » : intensité constante
+    if (mode === 'progressive') {
+      const ratio = rowScoreRatio(rowIndex);
+      if (ratio <= 0) return;                          // combinaison fausse : pas de feu d'artifice
+      power = 0.25 + 0.75 * ratio;                     // réussite partielle → salve modérée
+    }
     const r = rowEl && rowEl.getBoundingClientRect ? rowEl.getBoundingClientRect() : null;
     const x = (r && r.width) ? r.left + r.width / 2 : window.innerWidth / 2;
     const y = (r && r.height) ? r.top + r.height / 2 : window.innerHeight / 3;
-    fxShow(x, y, false);
+    fxShow(x, y, power);
   }
 
   function render() {
@@ -476,11 +506,27 @@
       const fresh = completedNow.filter((r) => completedPrev.indexOf(r) === -1);
       if (fresh.length) {
         const rowEl = $('#board').querySelector('.row[data-row="' + fresh[0] + '"]');
-        celebrateRow(rowEl);
+        celebrateRow(rowEl, fresh[0]);
       }
       if (rows.length && completedNow.length === rows.length &&
           completedPrev.length < rows.length) {
-        setTimeout(() => { if (fxEnabled()) fxShow(window.innerWidth / 2, window.innerHeight / 2, true); }, 550);
+        setTimeout(() => {
+          const mode = rewardsMode();
+          if (mode === 'off') return;
+          let power = 1.5;                             // toutes les lignes : grande salve
+          if (mode === 'progressive') {
+            const mods = assocMods();
+            let ok = 0;
+            rows.forEach((r, ri) => mods.forEach((m) => {
+              const key = occupantOf(m.id, ri);
+              if (key && board.items[key] && String(board.items[key].rowId) === String(r.id)) ok++;
+            }));
+            const ratio = mods.length ? ok / (rows.length * mods.length) : 0;
+            if (ratio <= 0) return;                    // tout faux : pas de célébration
+            power = 0.6 + 0.9 * ratio;
+          }
+          fxShow(window.innerWidth / 2, window.innerHeight / 2, power);
+        }, 550);
       }
     }
     completedPrev = completedNow;
