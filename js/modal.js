@@ -24,16 +24,17 @@
     open(opts) {
       this.close();
       const title = App.utils.escapeHtml(opts.title || '');
-      /* Couleur de l'étiquette de titre (barre supérieure de la fenêtre),
-         choisie par le prof pour les modules de texte enrichi. */
+      /* Étiquette de titre (bandeau supérieur de la fenêtre) : c'est le
+         BANDEAU qui prend la couleur choisie par le prof — pas le texte,
+         qui garde une couleur lisible (contraste automatique). */
       const tc = (typeof opts.titleColor === 'string' && /^#[0-9a-fA-F]{3,8}$/.test(opts.titleColor))
-        ? ' style="color:' + opts.titleColor + '"' : '';
+        ? ' style="background:' + opts.titleColor + ';color:' + App.utils.contrastText(opts.titleColor) + ';border-bottom-color:' + opts.titleColor + '"' : '';
       this.root.innerHTML =
         '<div class="modal-backdrop">' +
           '<div class="modal' + (opts.wide === true ? ' modal-wide' : '') +
           '" role="dialog" aria-modal="true">' +
-            '<div class="modal-head">' +
-              '<h3' + tc + '>' + title + '</h3>' +
+            '<div class="modal-head"' + tc + '>' +
+              '<h3>' + title + '</h3>' +
               '<button type="button" class="modal-close" data-close aria-label="Fermer">✕</button>' +
             '</div>' +
             '<div class="modal-body">' + (opts.html || '') + '</div>' +

@@ -129,6 +129,17 @@
     return String(html || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
   };
 
+  /** Couleur de texte lisible sur un fond donné (bandeaux colorés) :
+     encre foncée sur les fonds clairs, blanc sur les fonds foncés. */
+  utils.contrastText = function (hex) {
+    const m = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(String(hex || '').trim());
+    if (!m) return '#1f2937';
+    let h = m[1];
+    if (h.length === 3) h = h.split('').map((c) => c + c).join('');
+    const r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16);
+    return (0.299 * r + 0.587 * g + 0.114 * b) > 160 ? '#1f2937' : '#ffffff';
+  };
+
   /** Téléchargement d'un fichier généré (l'URL n'est révoquée qu'après le clic). */
   utils.download = function (filename, content, mime) {
     const url = URL.createObjectURL(new Blob([content], { type: mime || 'application/octet-stream' }));

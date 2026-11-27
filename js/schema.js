@@ -145,8 +145,8 @@
                        (v && (v.html || '').replace(/<[^>]+>/g, '').slice(0, 60)),
       formSchema: (v) => [
         { name:'title',      type:'richtext', label:'Titre (facultatif — mêmes outils de mise en forme que le contenu)', value:(v&&v.title)||'' },
-        { name:'titleColor', type:'color',    label:'Couleur de l\'étiquette de titre', value:(v&&v.titleColor)||'', allowEmpty:true,
-          hint:'Laisser « Par défaut » pour la couleur standard' },
+        { name:'titleColor', type:'color',    label:'Couleur de l\'étiquette de titre (bandeau de la fenêtre de lecture)', value:(v&&v.titleColor)||'', allowEmpty:true,
+          hint:'Colore le bandeau supérieur de la fenêtre de lecture — le texte reste lisible (contraste automatique)' },
         { name:'html',  type:'richtext', label:'Contenu',            value:(v&&v.html)||'' }
       ],
       build: (f) => ({ title: App.utils.sanitizeRich(f.title || ''),
@@ -183,20 +183,23 @@
         return ' style="' + Object.keys(fmt).map((k) => k + ':' + esc(fmt[k])).join(';') + '"';
       },
       render: (v, ctx) => {
-        /* La mise en forme du titre ne se répercute sur les éléments des
-           réserves que si le prof l'a demandé (option du module). */
-        const tc = (ctx && ctx.poolTitleStyle) ? App.schema.Types.richtext.titleStyleOf(v) : '';
-        const th = App.schema.Types.richtext.titleHtmlOf(v);
+        /* La mise en forme du titre (balises riches, couleur, taille…)
+           ne se répercute sur les éléments des réserves QUE si le prof
+           l'a demandé (option du module). Sans l'option : texte brut. */
+        const styled = !!(ctx && ctx.poolTitleStyle);
+        const tc = styled ? App.schema.Types.richtext.titleStyleOf(v) : '';
+        const th = styled ? App.schema.Types.richtext.titleHtmlOf(v) : '';
+        const plain = (v && v.title && App.utils.stripHtml(String(v.title)).trim()) ||
+          App.utils.stripHtml((v && v.html) || '').slice(0, 60) || 'Texte';
         if (ctx && ctx.titleOnly) {
-          const plain = (v && v.title && App.utils.stripHtml(String(v.title)).trim()) ||
-            App.utils.stripHtml((v && v.html) || '').slice(0, 60) || 'Texte';
           return '<div class="item item-info item-title-only" data-item-key="' + esc(ctx.key) +
             '" data-item-type="richtext" title="Cliquez pour lire">' +
             '<strong' + tc + '>' + (th || esc(plain)) + '</strong><span class="item-title-hint">\u25b8 lire</span></div>';
         }
         return '<div class="item item-info" data-item-key="' + esc(ctx.key) +
           '" data-item-type="richtext">' +
-          (th ? '<strong class="item-title-rich"' + tc + '>' + th + '</strong>' : '') +
+          ((th || (v && v.title)) ? '<strong class="item-title-rich"' + tc + '>' +
+            (th || esc(plain)) + '</strong>' : '') +
           '<div class="rich clamp">' + ((v && v.html) ? App.utils.resolveMediaInHtml(v.html) : '') + '</div>' +
           '</div>';
       },

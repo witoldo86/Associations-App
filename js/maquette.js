@@ -429,10 +429,13 @@
         flex ? 'flex-grow:' + poolSpanOf(m) + ';flex-basis:0' : '',
         m.poolColor ? 'background:' + esc(m.poolColor) : ''
       ].filter(Boolean).join(';');
+      /* Nom du pool : centré, tronqué avec « … » si trop long
+         (text-overflow ne fonctionne pas directement sur un conteneur flex). */
       return '<span class="mq-mini" data-drag-kind="module" data-drag-id="' + esc(m.id) +
         '" data-span-id="' + esc(m.id) + '"' +
         (st ? ' style="' + st + '"' : '') +
-        ' title="' + esc(m.id) + '">' + esc(modLabel(m)) + chipActions(m.id, true) + '</span>';
+        ' title="' + esc(m.id) + '"><span class="mq-mini-label" title="' + esc(modLabel(m)) + '">' +
+        esc(modLabel(m)) + '</span>' + chipActions(m.id, true) + '</span>';
     };
     let poolsInner;
     let poolsMiniAttr = '';

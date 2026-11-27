@@ -465,7 +465,9 @@
         const head = '<div class="info-module"><h4>' + esc(modLabel(m)) + '</h4>';
         if (m.infoMode === 'title') {
           const dv = infoDataOf(m);
-          const tc = (dv && dv.titleColor) ? ' style="color:' + esc(dv.titleColor) + '"' : '';
+          /* Étiquette = bandeau coloré, texte lisible (contraste automatique). */
+          const tc = (dv && dv.titleColor && /^#[0-9a-fA-F]{3,8}$/.test(dv.titleColor))
+            ? ' style="background:' + esc(dv.titleColor) + ';color:' + esc(App.utils.contrastText(dv.titleColor)) + ';border-color:' + esc(dv.titleColor) + '"' : '';
           return head +
             '<button type="button" class="info-title-link info-item-clickable" data-info-module="' + esc(m.id) + '"' + tc +
             ' title="Afficher en grand">' + esc(infoTitleOf(m)) + '</button></div>';

@@ -1186,6 +1186,14 @@ body.student-mode .pool > .item{
 }
 .mq-mini:hover{ border-color:var(--primary, #2563eb); }
 .mq-mini:hover{ overflow:visible; flex-wrap:wrap; white-space:normal; }
+/* Nom du pool : centré et tronqué avec « … » quand il est trop long.
+   (Le conteneur est en flex : c'est le libellé lui-même qui porte
+   l'ellipse, un conteneur flex ne peut pas tronquer son texte direct.) */
+.mq-mini .mq-mini-label{
+  flex:1 1 auto; min-width:0; text-align:center;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.mq-mini:hover .mq-mini-label{ white-space:normal; overflow:visible; }
 .mq-mini .mq-acts{ opacity:0; }
 .mq-mini.dragging{ opacity:.3; }
 
