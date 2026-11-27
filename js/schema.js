@@ -159,9 +159,33 @@
         const t = String(v.title);
         return /<[a-z][\s\S]*>/i.test(t) ? App.utils.resolveMediaInHtml(t) : esc(t);
       },
-      titleStyleOf: (v) => (v && v.titleColor) ? ' style="color:' + esc(v.titleColor) + '"' : '',
+      /* Paramètres de mise en forme du titre (étiquette) : la couleur
+         dédiée + les styles inline du premier élément stylé du titre
+         (taille, police… posés via l'éditeur riche). */
+      titleFmtOf: (v) => {
+        if (!v) return null;
+        const out = {};
+        if (typeof v.titleColor === 'string' && /^#[0-9a-fA-F]{3,8}$/.test(v.titleColor)) {
+          out.color = v.titleColor;
+        }
+        const st = /style="([^"]*)"/i.exec(String(v.title || ''));
+        if (st) {
+          ['font-size','font-family','font-weight','font-style','line-height','text-align'].forEach((p) => {
+            const mm = new RegExp('(?:^|;)\\s*' + p + '\\s*:\\s*([^;]+)', 'i').exec(st[1]);
+            if (mm) out[p] = mm[1].trim();
+          });
+        }
+        return Object.keys(out).length ? out : null;
+      },
+      titleStyleOf: (v) => {
+        const fmt = App.schema.Types.richtext.titleFmtOf(v);
+        if (!fmt) return '';
+        return ' style="' + Object.keys(fmt).map((k) => k + ':' + esc(fmt[k])).join(';') + '"';
+      },
       render: (v, ctx) => {
-        const tc = App.schema.Types.richtext.titleStyleOf(v);
+        /* La mise en forme du titre ne se répercute sur les éléments des
+           réserves que si le prof l'a demandé (option du module). */
+        const tc = (ctx && ctx.poolTitleStyle) ? App.schema.Types.richtext.titleStyleOf(v) : '';
         const th = App.schema.Types.richtext.titleHtmlOf(v);
         if (ctx && ctx.titleOnly) {
           const plain = (v && v.title && App.utils.stripHtml(String(v.title)).trim()) ||
@@ -178,6 +202,7 @@
       },
       open: (v) => App.modal.open({
         title: (v && v.title) ? (App.utils.stripHtml(String(v.title)) || 'Cartel') : 'Cartel',
+        titleColor: (v && v.titleColor) || '',
         html: '<div class="modal-rich">' + ((v && v.html) ? App.utils.resolveMediaInHtml(v.html) : '') + '</div>'
       })
     }

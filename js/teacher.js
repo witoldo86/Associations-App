@@ -397,6 +397,14 @@
             N'afficher que le titre dans les réserves de l'élève — pour un module
             de texte enrichi (un clic sur le titre ouvre le contenu)
           </label>
+          <label class="inline" style="gap:.45rem">
+            <input id="mf-pooltitlestyle" type="checkbox" ${m && m.kind === 'richtext' && m.poolTitleStyle ? 'checked' : ''}>
+            Dans les réserves, les éléments reprennent la mise en forme du titre
+            (couleur de l'étiquette, taille, police…)
+          </label>
+          <span class="hint">Sans cette coche, les éléments des réserves restent
+            neutres : la mise en forme du titre ne s'applique qu'à la barre de titre
+            de la fenêtre de lecture.</span>
         </div>
       ${isInfo ? `<div class="field">
           <label>Affichage du panneau d'information</label>
@@ -493,6 +501,8 @@
     const payload = { id, label, kind, role, unlockAfter,
       poolCols: poolColsRaw ? Number(poolColsRaw) : null,
       poolTitleOnly: kind === 'richtext' && !!(poolTitleEl && poolTitleEl.checked),
+      poolTitleStyle: kind === 'richtext' &&
+        !!(document.getElementById('mf-pooltitlestyle') && document.getElementById('mf-pooltitlestyle').checked),
       clickable: !!(clickableEl && clickableEl.checked),
       /* Panneau informatif visible dès qu'une des lignes cochées est
          complétée (ou des éléments consultés, via le verrou) ; liste
@@ -780,7 +790,7 @@ function onToggleFlattenAll() {
     let main = '';
     if (m.kind === 'text') main = esc(String(v).trim());
     else if (m.kind === 'richtext') {
-      const title = v && v.title ? String(v.title).trim() : '';
+      const title = v && v.title ? App.utils.stripHtml(String(v.title)) : '';
       const txt = App.utils.stripHtml((v && v.html) || '');
       main = esc(title || txt.slice(0, 60) || '(texte)');
     } else {
@@ -822,7 +832,7 @@ function onToggleFlattenAll() {
       const shortClass = raw.length <= 16 ? ' is-short' : '';
       content = `<span class="cell-text${shortClass}">${esc(v)}</span>`;
     } else if (m.kind === 'richtext') {
-      const title = v && v.title ? String(v.title).trim() : '';
+      const title = v && v.title ? App.utils.stripHtml(String(v.title)) : '';
       const rawHtml = v && v.html ? String(v.html) : '';
       const txt = App.utils.stripHtml(rawHtml);
       const totalLen = (title + ' ' + txt).trim().length;
@@ -1175,7 +1185,9 @@ function onToggleFlattenAll() {
               </select>
               <span class="rte-sep"></span>
               <label class="rte-color"><input type="color" class="rte-color-input" data-color="fore" value="#dc2626"><span>Couleur</span></label>
+              <button type="button" class="rte-btn" data-apply-color="fore" title="Appliquer la couleur choisie" aria-label="Appliquer la couleur choisie">✓</button>
               <label class="rte-color"><input type="color" class="rte-color-input" data-color="back" value="#fef3c7"><span>Surligner</span></label>
+              <button type="button" class="rte-btn" data-apply-color="back" title="Appliquer la couleur de surlignage choisie" aria-label="Appliquer le surlignage choisi">✓</button>
               <span class="rte-sep"></span>
               <button type="button" class="rte-btn" data-action="rte-image" title="Insérer une image">🖼</button>
               <button type="button" class="rte-btn" data-cmd="clear" title="Effacer la mise en forme">✕</button>
@@ -1203,6 +1215,20 @@ function onToggleFlattenAll() {
         e.stopPropagation();
         const rteEl = previewBtn.closest('.rte');
         if (rteEl) openStudentTextPreview(rteEl);
+        return;
+      }
+      /* ✓ Appliquer : AVANT la branche générique .rte-btn (le bouton porte
+         aussi cette classe) — applique la couleur choisie au carré voisin. */
+      const applyColorBtn = e.target.closest('[data-apply-color]');
+      if (applyColorBtn) {
+        e.preventDefault();
+        const rteEl = applyColorBtn.closest('.rte');
+        const colorInput = rteEl && rteEl.querySelector('.rte-color-input[data-color="' + applyColorBtn.dataset.applyColor + '"]');
+        if (rteEl && colorInput) {
+          const editor = rteEl.querySelector('.rte-editor');
+          rteRestoreSelection(editor);
+          document.execCommand(colorInput.dataset.color === 'fore' ? 'foreColor' : 'hiliteColor', false, colorInput.value);
+        }
         return;
       }
       const btn = e.target.closest('.rte-btn');
@@ -1243,13 +1269,10 @@ function onToggleFlattenAll() {
         if (hidden) hidden.value = titleColor.value;
         return;
       }
-      const colorInput = e.target.closest('.rte-color-input');
-      if (colorInput) {
-        const editor = colorInput.closest('.rte').querySelector('.rte-editor');
-        rteRestoreSelection(editor);
-        document.execCommand(colorInput.dataset.color === 'fore' ? 'foreColor' : 'hiliteColor', false, colorInput.value);
-        return;
-      }
+      /* Couleurs du texte : l'application « en direct » pendant le choix
+         (event input) fragmentait la sélection. La couleur est appliquée
+         à la validation du sélecteur natif (event change, ci-dessous) ou
+         via le bouton ✓ à côté du carré de couleur. */
       if (e.target.id && e.target.id.endsWith('_url')) {
         const baseId = e.target.id.slice(0, -4);
         document.getElementById(baseId).value = e.target.value;
@@ -1262,6 +1285,12 @@ function onToggleFlattenAll() {
       }
     });
     formEl.addEventListener('change', (e) => {
+      if (e.target.classList && e.target.classList.contains('rte-color-input')) {
+        const editor = e.target.closest('.rte').querySelector('.rte-editor');
+        rteRestoreSelection(editor);
+        document.execCommand(e.target.dataset.color === 'fore' ? 'foreColor' : 'hiliteColor', false, e.target.value);
+        return;
+      }
       if (e.target.id && e.target.id.endsWith('_file')) {
         const baseId = e.target.id.slice(0, -5);
         onFileField(e.target, baseId);

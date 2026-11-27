@@ -280,7 +280,8 @@
     const item = board.items[key];
     const mod = cfg().modules.find((x) => String(x.id) === String(item.moduleId));
     return App.schema.Types[item.kind].render(item.value,
-      { key, module: item.moduleId, titleOnly: !!(mod && mod.poolTitleOnly) });
+      { key, module: item.moduleId, titleOnly: !!(mod && mod.poolTitleOnly),
+        poolTitleStyle: !!(mod && mod.poolTitleStyle) });
   };
 
   /* Signature d'une valeur : pour dédupliquer la réserve. Quand le prof a
@@ -513,7 +514,10 @@
       type.open(v);
       return;
     }
-    App.modal.open({ title: modLabel(m), html: body || '<p>—</p>', wide: m.kind === 'url' });
+    const infoTitle = (m.kind === 'richtext' && v && v.title &&
+      App.utils.stripHtml(String(v.title))) || modLabel(m);
+    App.modal.open({ title: infoTitle, html: body || '<p>—</p>', wide: m.kind === 'url',
+      titleColor: (m.kind === 'richtext' && v && v.titleColor) || '' });
   }
 
   /* =========================================================
