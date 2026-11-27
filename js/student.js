@@ -15,6 +15,9 @@
   let moduleState = {};   // { [moduleId]: { locked, deps } }
   // Bacs dont la taille des vignettes est déjà figée (voir freezePoolColumns)
   const frozenPools = {};
+  /* Lignes complètes au rendu précédent : pour ne fêter que les lignes qui
+     VIENNENT d'être complétées (pas un simple re-rendu, ni le chargement). */
+  let completedPrev = null;
   let expandedModuleId = null;
   let hoverEl = null;
   let moveFrame = 0;
@@ -135,6 +138,7 @@
   S.reset = function () {
     const c = cfg();
     const mods = assocMods();
+    completedPrev = null;   // pas de feux d'artifice au chargement initial
 
     const subEl = $('#s-instructions');
     const sub = c.subtitle || '';
@@ -342,6 +346,53 @@
     return [...reps.values()].map(itemHtml).join('');
   }
 
+  /* =========================================================
+     RÉCOMPENSES VISUELLES (option prof : layout.rewards)
+     Feux d'artifice quand une ligne passe de incomplète à complète ;
+     grande salve quand TOUTES les lignes le sont. Couche fixe sans
+     interaction (pointer-events:none), particules auto-nettoyées.
+     ========================================================= */
+  const FX_COLORS = ['#f59e0b','#ef4444','#22c55e','#3b82f6','#a855f7','#ec4899','#facc15','#14b8a6'];
+  function fxLayer() {
+    let el = document.getElementById('fx-layer');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'fx-layer';
+      document.body.appendChild(el);
+    }
+    return el;
+  }
+  function fxShow(x, y, big) {
+    const layer = fxLayer();
+    const n = big ? 60 : 30;
+    for (let i = 0; i < n; i++) {
+      const s = document.createElement('span');
+      s.className = 'fx-spark';
+      const ang = Math.random() * Math.PI * 2;
+      const dist = (big ? 90 : 55) + Math.random() * (big ? 130 : 80);
+      s.style.left = Math.round(x) + 'px';
+      s.style.top = Math.round(y) + 'px';
+      s.style.setProperty('--fx-x', Math.round(Math.cos(ang) * dist) + 'px');
+      s.style.setProperty('--fx-y', Math.round(Math.sin(ang) * dist) + 'px');
+      s.style.setProperty('--fx-c', FX_COLORS[i % FX_COLORS.length]);
+      s.style.setProperty('--fx-d', (0.7 + Math.random() * 0.6).toFixed(2) + 's');
+      s.style.setProperty('--fx-s', (0.6 + Math.random() * 0.9).toFixed(2));
+      layer.appendChild(s);
+      setTimeout(() => { if (s.parentNode) s.parentNode.removeChild(s); }, 1600);
+    }
+  }
+  function fxEnabled() {
+    const l = cfg().layout || {};
+    return l.rewards === true;
+  }
+  function celebrateRow(rowEl) {
+    if (!fxEnabled()) return;
+    const r = rowEl && rowEl.getBoundingClientRect ? rowEl.getBoundingClientRect() : null;
+    const x = (r && r.width) ? r.left + r.width / 2 : window.innerWidth / 2;
+    const y = (r && r.height) ? r.top + r.height / 2 : window.innerHeight / 3;
+    fxShow(x, y, false);
+  }
+
   function render() {
     const rows = App.state.rows();
     const mods = assocMods();
@@ -350,7 +401,7 @@
     $('#s-empty').hidden = hasData;
     $('#s-pools-zone').style.display = hasData ? '' : 'none';
     updateSaveButton();
-    if (!hasData) { $('#board').innerHTML = ''; return; }
+    if (!hasData) { $('#board').innerHTML = ''; completedPrev = null; return; }
 
     mods.forEach((m) => { moduleState[m.id] = moduleLock(m, mods); });
 
@@ -405,6 +456,34 @@
     boardEl.style.setProperty('--cols-tpl', boardPlan.tpl);
     boardEl.innerHTML = html;
     balancePools();
+
+    checkCompletions();
+  }
+
+  /* Récompenses visuelles : on fête les lignes qui VIENNENT d'être
+     complétées (transition depuis l'affichage précédent) — pas les lignes
+     déjà complètes au chargement, ni un simple re-rendu. Appelé après
+     chaque changement de placement (dépôt complet comme partiel). */
+  function checkCompletions() {
+    if (!board) return;
+    const rows = App.state.rows();
+    const mods = assocMods();
+    const completedNow = [];
+    for (let r = 0; r < rows.length; r++) {
+      if (mods.every((m) => occupantOf(m.id, r))) completedNow.push(r);
+    }
+    if (completedPrev !== null) {
+      const fresh = completedNow.filter((r) => completedPrev.indexOf(r) === -1);
+      if (fresh.length) {
+        const rowEl = $('#board').querySelector('.row[data-row="' + fresh[0] + '"]');
+        celebrateRow(rowEl);
+      }
+      if (rows.length && completedNow.length === rows.length &&
+          completedPrev.length < rows.length) {
+        setTimeout(() => { if (fxEnabled()) fxShow(window.innerWidth / 2, window.innerHeight / 2, true); }, 550);
+      }
+    }
+    completedPrev = completedNow;
   }
 
   /* Agencement exact d'une ligne de référence réalisé sur la ligne du
@@ -815,6 +894,7 @@ function cleanupDrag() {
 
   /** Met à jour uniquement la réserve du module et les cases concernées. */
 function refreshDropDisplay(moduleId, rowIndex, previousRow) {
+  checkCompletions();   // le placement vient d'être mis à jour : fêter si besoin
   const m = assocMods().find((x) => x.id === moduleId); 
   const pool = root.querySelector(`#pool-${cssId(moduleId)}`);
 

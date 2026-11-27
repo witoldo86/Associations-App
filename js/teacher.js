@@ -162,6 +162,10 @@
               '<option value="pools"' + (asideModeLocal(l) === 'pools' ? ' selected' : '') + '>À gauche et à droite des réserves</option>' +
               '<option value="both"' + (asideModeLocal(l) === 'both' ? ' selected' : '') + '>Pleine hauteur — à côté des réserves et du plateau</option>' +
             '</select></div>' +
+          '<label class="inline" style="gap:.45rem;margin:.35rem 0">' +
+            '<input type="checkbox" id="gd-rewards"' + (l.rewards ? ' checked' : '') + '>' +
+            'Récompenses visuelles : feux d’artifice quand une ligne est complétée' +
+          '</label>' +
           '<p class="hint">Le <strong>plateau</strong> est la zone où l’élève dépose ses réponses ; ' +
             'les <strong>réserves</strong> sont les bacs d’où il pioche les éléments. ' +
             'Dans chaque ligne, les largeurs réglées avec les poignées sont conservées.</p>' +
@@ -177,7 +181,8 @@
         boardCols: gridNLocal(document.getElementById('gd-board').value),
         poolsCols: gridNLocal(document.getElementById('gd-pools').value),
         infosAside: document.getElementById('gd-infos').value,
-        infosBesidePools: document.getElementById('gd-infos').value === 'pools'
+        infosBesidePools: document.getElementById('gd-infos').value === 'pools',
+        rewards: !!(document.getElementById('gd-rewards') && document.getElementById('gd-rewards').checked)
       });
       App.state.updateConfig(c2);
       App.modal.close();
@@ -400,11 +405,12 @@
           <label class="inline" style="gap:.45rem">
             <input id="mf-pooltitlestyle" type="checkbox" ${m && m.kind === 'richtext' && m.poolTitleStyle ? 'checked' : ''}>
             Dans les réserves, les éléments reprennent la mise en forme du titre
-            (couleur de l'étiquette, taille, police…)
+            (taille, police, gras, italique, surlignage…)
           </label>
           <span class="hint">Sans cette coche, les éléments des réserves restent
-            neutres : la mise en forme du titre ne s'applique qu'à la barre de titre
-            de la fenêtre de lecture.</span>
+            neutres. La couleur de l'étiquette, elle, colore toujours le bandeau
+            de la fenêtre de lecture — jamais le texte des réserves (un titre
+            surligné reste lisible).</span>
         </div>
       ${isInfo ? `<div class="field">
           <label>Affichage du panneau d'information</label>

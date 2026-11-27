@@ -177,10 +177,16 @@
         }
         return Object.keys(out).length ? out : null;
       },
+      /* Styles repris dans les réserves : taille, police, graisse… mais
+         JAMAIS la couleur : la couleur d'étiquette (titleColor) est
+         réservée au bandeau de la fenêtre de lecture. Autrement, un titre
+         surligné de la même teinte que l'étiquette devenait illisible
+         (texte de la couleur du surlignage). */
       titleStyleOf: (v) => {
         const fmt = App.schema.Types.richtext.titleFmtOf(v);
         if (!fmt) return '';
-        return ' style="' + Object.keys(fmt).map((k) => k + ':' + esc(fmt[k])).join(';') + '"';
+        return ' style="' + Object.keys(fmt).filter((k) => k !== 'color')
+          .map((k) => k + ':' + esc(fmt[k])).join(';') + '"';
       },
       render: (v, ctx) => {
         /* La mise en forme du titre (balises riches, couleur, taille…)
@@ -196,6 +202,8 @@
             '" data-item-type="richtext" title="Cliquez pour lire">' +
             '<strong' + tc + '>' + (th || esc(plain)) + '</strong><span class="item-title-hint">\u25b8 lire</span></div>';
         }
+        /* NB : tc ne porte jamais la couleur d'étiquette (cf. titleStyleOf) :
+           le texte du titre garde l'encre normale, même surligné. */
         return '<div class="item item-info" data-item-key="' + esc(ctx.key) +
           '" data-item-type="richtext">' +
           ((th || (v && v.title)) ? '<strong class="item-title-rich"' + tc + '>' +

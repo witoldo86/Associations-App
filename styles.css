@@ -1561,3 +1561,27 @@ body.student-mode #s-pools-zone .pool-col.is-expanded .item-image img{
   box-shadow:0 10px 24px rgba(15,23,42,.18);
   max-height:min(60vh, 520px); overflow-y:auto;
 }
+
+/* =========================================================
+   RÉCOMPENSES VISUELLES (option prof : feux d'artifice)
+   Couche fixe au-dessus de tout, sans interaction ; chaque
+   étincelle part du point d'origine vers (--fx-x, --fx-y).
+   ========================================================= */
+#fx-layer{
+  position:fixed; inset:0; pointer-events:none; z-index:3000;
+  overflow:hidden;
+}
+.fx-spark{
+  position:absolute; width:8px; height:8px; border-radius:50%;
+  background:var(--fx-c, #f59e0b);
+  box-shadow:0 0 6px 1px var(--fx-c, #f59e0b);
+  animation:fx-fly var(--fx-d, .9s) cubic-bezier(.15,.6,.4,1) forwards;
+}
+@keyframes fx-fly{
+  from{ transform:translate(0,0) scale(var(--fx-s,1)); opacity:1; }
+  70%{ opacity:1; }
+  to{ transform:translate(var(--fx-x,40px), var(--fx-y,60px)) scale(.2); opacity:0; }
+}
+@media(prefers-reduced-motion:reduce){
+  #fx-layer{ display:none; }
+}
