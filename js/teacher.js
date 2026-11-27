@@ -364,6 +364,48 @@
        et réactivée en direct si le prof change le rôle. */
     const currentRole = m ? m.role : (presetRole || 'associate');
 
+    /* Verrouillage pédagogique : on distingue clairement les conditions liées
+       aux réserves (modules « à associer ») de celles liées aux panneaux
+       d'information (modules informatifs), et on ajoute la condition
+       « mot de passe » (l'élève doit le saisir dans une fenêtre). */
+    const othersAssoc = others.filter((o) => o.role === 'associate');
+    const othersInfo = others.filter((o) => o.role === 'informative');
+    const lockChecks = (list, emptyText) => list.map((o) => `
+            <label class="inline" style="gap:.3rem">
+              <input type="checkbox" data-unlock="${esc(o.id)}" ${unlockSet.has(o.id)?'checked':''}>
+              ${esc(o.label || o.id)}
+            </label>`).join('') || '<span class="hint">' + emptyText + '</span>';
+    const lockBlock = `
+      <fieldset class="module-fieldset" id="mf-unlock-fieldset">
+        <legend>Verrouillage pédagogique (optionnel)</legend>
+        <div class="hint" style="margin-bottom:.3rem">Conditions à remplir avant que ce module soit accessible
+          (ou avant qu'il apparaisse, s'il s'agit d'un panneau d'information).
+          Plusieurs conditions peuvent être cochées : elles s'ajoutent.</div>
+        <div class="mf-lock-group">
+          <div class="mf-lock-title">Avant tout — les réserves (modules « à associer »)</div>
+          <div class="hint" style="margin-bottom:.3rem">L'élève doit d'abord avoir ouvert tous les éléments des réserves cochées.</div>
+          <div class="inline">${lockChecks(othersAssoc, 'Aucun module « à associer » pour le moment.')}</div>
+        </div>
+        <div class="mf-lock-group">
+          <div class="mf-lock-title">Les panneaux d'information (modules informatifs)</div>
+          <div class="hint" style="margin-bottom:.3rem">L'élève doit d'abord avoir consulté le contenu des panneaux cochés.</div>
+          <div class="inline">${lockChecks(othersInfo, 'Aucun module informatif pour le moment.')}</div>
+        </div>
+        <div class="mf-lock-group">
+          <div class="mf-lock-title">Mot de passe</div>
+          <label class="inline" style="gap:.45rem">
+            <input id="mf-pw-on" type="checkbox" ${m && m.password ? 'checked' : ''}>
+            Exiger un mot de passe pour ouvrir ce module
+          </label>
+          <div class="field" id="mf-pw-field">
+            <label for="mf-password">Mot de passe (visible ici — côté élève, il devra le saisir dans une fenêtre)</label>
+            <input id="mf-password" type="text" value="${esc((m && m.password) || '')}" placeholder="ex. 1725" autocomplete="off">
+          </div>
+          <span class="hint">Ce mot de passe est une clé pédagogique (donnée visible dans l'exercice),
+            pas une protection de confidentialité.</span>
+        </div>
+      </fieldset>`;
+
     /* Onglet « Contenu du pool » : vue d'ensemble en lecture seule des
        contenus déjà saisis (mêmes éléments que la fenêtre 📄 de la maquette). */
     const overviewHtml = isNew
@@ -410,17 +452,6 @@
           </select>
         </div>
       </div>
-      <div class="field">
-        <label>Verrouillage pédagogique (optionnel)</label>
-        <div class="hint" style="margin-bottom:.3rem">L'élève doit d'abord avoir ouvert tous les éléments des modules cochés.</div>
-        <div class="inline">
-          ${others.map((o) => `
-            <label class="inline" style="gap:.3rem">
-              <input type="checkbox" data-unlock="${esc(o.id)}" ${unlockSet.has(o.id)?'checked':''}>
-              ${esc(o.label || o.id)}
-            </label>`).join('') || '<span class="hint">Aucun autre module.</span>'}
-        </div>
-      </div>
       <div class="field" id="mf-clickable-row">
         <label class="inline" style="gap:.45rem">
           <input id="mf-clickable" type="checkbox" ${m && m.clickable ? 'checked' : ''}>
@@ -429,6 +460,7 @@
         </label>
       </div>
       ${revealBlock}
+      ${lockBlock}
       </div>
       <div class="modal-tabpane" data-pane="present" hidden>
       <div class="field">
@@ -623,6 +655,11 @@
     const revealChecked = [...document.querySelectorAll('input[data-reveal-row]:checked')]
       .map((x) => x.dataset.revealRow);
     const poolTitleEl = document.getElementById('mf-pooltitle');
+    /* Mot de passe (verrouillage pédagogique) : actif seulement si la case
+       est cochée ET qu'un mot de passe non vide est saisi. */
+    const pwOnEl = document.getElementById('mf-pw-on');
+    const pwEl = document.getElementById('mf-password');
+    const password = (pwOnEl && pwOnEl.checked && pwEl) ? pwEl.value.trim() : '';
     /* Couleur de fond du bac (onglet Présentation) : '' = pas de teinte.
        Appliquée côte élève via --pool-color ; le bouton 🎨 des réserves
        disparaît de la maquette — c'est ici qu'on la règle désormais. */
@@ -637,6 +674,7 @@
       poolTitleStyle: kind === 'richtext' &&
         !!(document.getElementById('mf-pooltitlestyle') && document.getElementById('mf-pooltitlestyle').checked),
       clickable: !!(clickableEl && clickableEl.checked),
+      password,
       /* Panneau informatif visible dès qu'une des lignes cochées est
          complétée (ou des éléments consultés, via le verrou) ; liste
          vide = toujours visible. */

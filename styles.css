@@ -1419,6 +1419,17 @@ body.student-mode #s-pools-zone .pool-col.is-expanded .item-image img{
 .modal-tabpane .field.is-disabled{ opacity:.45; }
 .modal-tabpane .field.is-disabled input[type="checkbox"]{ cursor:not-allowed; }
 
+/* Verrouillage pédagogique : groupes distincts (réserves / panneaux d'info /
+   mot de passe) dans l'onglet Module */
+.mf-lock-group{
+  border:1px solid var(--line,#e5e7eb); border-radius:8px;
+  padding:.55rem .7rem; margin:.5rem 0; background:#fafafa;
+}
+.mf-lock-title{ font-weight:600; font-size:.88rem; margin-bottom:.25rem; color:#374151; }
+
+/* Côté élève : bac verrouillé par un mot de passe */
+.pw-lock{ display:flex; flex-direction:column; align-items:flex-start; gap:.4rem; }
+
 /* Miniature de la disposition dans le bac (onglet Présentation) */
 .mf-grid-preview{
   display:flex; flex-wrap:wrap; gap:6px;

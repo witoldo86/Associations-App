@@ -12,7 +12,8 @@
   let board = null;
   let drag = null;
   let viewed = {};        // { [moduleId]: Set(keys) }
-  let moduleState = {};   // { [moduleId]: { locked, deps } }
+  let moduleState = {};   // { [moduleId]: { locked, deps, pw } }
+  let pwOk = {};          // { [moduleId]: true } — mot de passe déjà saisi (session)
   // Bacs dont la taille des vignettes est déjà figée (voir freezePoolColumns)
   const frozenPools = {};
   /* Lignes complètes au rendu précédent : pour ne fêter que les lignes qui
@@ -111,6 +112,8 @@
     $('#s-reset').addEventListener('click', () => S.reset());
     $('#s-save').addEventListener('click', onSave);
     root.addEventListener('click', (e) => {
+      const pwBtn = e.target.closest('[data-pw-module]');
+      if (pwBtn) { openPasswordModal(pwBtn.dataset.pwModule); return; }
       const el = e.target.closest('.info-item-clickable');
       if (el) openInfoModal(el.dataset.infoModule);
     });
@@ -219,6 +222,7 @@
     expandedModuleId = null;
 
     viewed = {};
+    pwOk = {};
     Object.keys(frozenPools).forEach((k) => { delete frozenPools[k]; });
     mods.forEach((m) => { viewed[m.id] = new Set(); });
     buildBoard();
@@ -265,13 +269,55 @@
      VERROU (unlockAfter)
      ========================================================= */
   function moduleLock(m, mods) {
-    if (!m.unlockAfter || !m.unlockAfter.length) return { locked: false };
+    /* Condition « mot de passe » : le module reste verrouillé tant que
+       l'élève n'a pas saisi le bon mot de passe (fenêtre dédiée). */
+    const pwLocked = !!m.password && !pwOk[m.id];
+    if (!m.unlockAfter || !m.unlockAfter.length) {
+      if (!pwLocked) return { locked: false };
+      return { locked: true, pw: true, deps: [] };
+    }
     const deps = m.unlockAfter.map((id) => {
       const dep = mods.find((x) => x.id === id);
       if (!dep) return null;
       return { id, label: modLabel(dep), total: board.keys[id].length, seen: viewed[id].size };
     }).filter(Boolean);
-    return { locked: deps.some((d) => d.seen < d.total), deps };
+    return { locked: deps.some((d) => d.seen < d.total) || pwLocked, pw: pwLocked, deps };
+  }
+
+  /* Fenêtre « mot de passe » : l'élève saisit la clé du prof. En cas de
+     succès, le module est déverrouillé (pour toute la session) puis la
+     suite (onOk) s'exécute — par exemple l'ouverture du contenu. */
+  function openPasswordModal(moduleId, onOk) {
+    const m = cfg().modules.find((x) => String(x.id) === String(moduleId));
+    if (!m || !m.password) return;
+    App.modal.open({
+      title: 'Mot de passe — ' + modLabel(m),
+      html: '<form id="pw-form" novalidate>' +
+        '<p class="hint">Ce contenu est protégé par un mot de passe. ' +
+        'Demandez-le à votre enseignant(e).</p>' +
+        '<div class="field"><label for="pw-input">Mot de passe</label>' +
+        '<input id="pw-input" type="password" autocomplete="off"></div>' +
+        '<p class="hint" id="pw-error" role="alert" hidden style="color:#b91c1c">' +
+        'Mot de passe incorrect — essayez encore.</p>' +
+        '<div class="form-actions">' +
+        '<button type="button" class="btn" data-close>Annuler</button>' +
+        '<button type="submit" class="btn primary" id="pw-ok">Valider</button>' +
+        '</div></form>'
+    });
+    const form = document.getElementById('pw-form');
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const input = document.getElementById('pw-input');
+      if (input && input.value === m.password) {
+        pwOk[m.id] = true;
+        App.modal.close();
+        if (typeof onOk === 'function') onOk(); else render();
+      } else {
+        const err = document.getElementById('pw-error');
+        if (err) err.hidden = false;
+        if (input) { input.value = ''; input.focus(); }
+      }
+    });
   }
 
   /* =========================================================
@@ -445,9 +491,17 @@
       if (!pool) return;
       const lock = moduleState[m.id];
       if (lock.locked) {
-        const progress = lock.deps.map((d) => d.seen + '/' + d.total).join(', ');
-        pool.innerHTML = '<p class="hint" role="status" aria-live="polite">' +
-          'Ouvrez d’abord les éléments requis (' + progress + ').</p>';
+        if (lock.pw) {
+          /* Verrou « mot de passe » : bouton qui ouvre la fenêtre de saisie. */
+          pool.innerHTML = '<div class="pw-lock">' +
+            '<p class="hint" role="status" aria-live="polite">Ce bac est protégé par un mot de passe.</p>' +
+            '<button type="button" class="btn small" data-pw-module="' + esc(m.id) + '">' +
+            '\ud83d\udd13 Entrer le mot de passe</button></div>';
+        } else {
+          const progress = lock.deps.map((d) => d.seen + '/' + d.total).join(', ');
+          pool.innerHTML = '<p class="hint" role="status" aria-live="polite">' +
+            'Ouvrez d’abord les éléments requis (' + progress + ').</p>';
+        }
       } else {
         pool.innerHTML = poolHtml(m.id);
         /* Figé la taille des vignettes au premier affichage du bac complet :
@@ -622,6 +676,12 @@
   function openInfoModal(moduleId) {
     const m = infoMods().find((x) => String(x.id) === String(moduleId));
     if (!m) return;
+    /* Verrou « mot de passe » : la fenêtre de saisie s'ouvre d'abord ;
+       le contenu ne s'affiche qu'après la bonne clé. */
+    if (m.password && !pwOk[m.id]) {
+      openPasswordModal(m.id, () => openInfoModal(moduleId));
+      return;
+    }
     const v = infoDataOf(m);
     const type = App.schema.Types[m.kind];
     if (!type || !v) return;
