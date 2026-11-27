@@ -204,9 +204,11 @@
         const plain = (v && v.title && App.utils.stripHtml(String(v.title)).trim()) ||
           App.utils.stripHtml((v && v.html) || '').slice(0, 60) || 'Texte';
         if (ctx && ctx.titleOnly) {
+          /* Plus d'indication « ▸ lire » dans les réserves (demande prof) :
+             le titre seul suffit, l'info-bulle reste au survol. */
           return '<div class="item item-info item-title-only" data-item-key="' + esc(ctx.key) +
             '" data-item-type="richtext" title="Cliquez pour lire">' +
-            '<strong' + tc + '>' + (th || esc(plain)) + '</strong><span class="item-title-hint">\u25b8 lire</span></div>';
+            '<strong' + tc + '>' + (th || esc(plain)) + '</strong></div>';
         }
         /* NB : tc ne porte jamais la couleur d'étiquette (cf. titleStyleOf) :
            le texte du titre garde l'encre normale, même surligné. */

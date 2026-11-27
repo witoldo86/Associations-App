@@ -595,14 +595,11 @@ body.student-mode .row{ grid-template-columns:var(--cols-tpl,repeat(var(--cols,3
 .info-module .item{
   cursor:default; box-shadow:none; margin-bottom:.4rem;
 }
-/* Étiquette « titre seul » (réserves) : titre + petite invite de clic */
+/* Étiquette « titre seul » (réserves) : le titre seul, centré.
+   (L'indication « ▸ lire » a été retirée à la demande du prof.) */
 .item-title-only{
-  display:flex; align-items:center; justify-content:center; gap:.45rem;
+  display:flex; align-items:center; justify-content:center;
   text-align:center; padding:.55rem .7rem;
-}
-.item-title-only .item-title-hint{
-  font-size:.7rem; text-transform:uppercase; letter-spacing:.05em;
-  color:var(--muted); flex:none;
 }
 .info-module .item:hover{ box-shadow:none; }
 @media (max-width:780px){
