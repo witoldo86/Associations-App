@@ -631,9 +631,74 @@
       return num + '<div class="mini-info">' + esc(s || '(vide)') + '</div>';
     }).join('<hr>');
 
+    const uniformBtn = (m.kind === 'richtext' && rows.length > 1)
+      ? '<div class="form-actions"><button type="button" class="btn" id="mc-uniform" ' +
+        'title="Donner à tous les éléments la même mise en forme">🖌 Uniformiser le style de tous les éléments…</button></div>' : '';
+
     App.modal.open({
       title: (m.label || m.id) + ' — contenus en place (' + count + '/' + rows.length + ')',
-      html: '<div class="module-contents">' + (rows.length ? items : '<p class="hint">Aucune ligne pour le moment.</p>') + '</div>'
+      html: uniformBtn +
+        '<div class="module-contents">' + (rows.length ? items : '<p class="hint">Aucune ligne pour le moment.</p>') + '</div>'
+    });
+
+    const ub = document.getElementById('mc-uniform');
+    if (ub) ub.addEventListener('click', () => openUniformDialog(m.id));
+  }
+
+  /* =========================================================
+     UNIFORMISER LE STYLE — tous les éléments d'une même réserve
+     (bouton 🖌 de la fenêtre « contenus en place »). Le prof choisit
+     l'élément modèle ; les autres reprennent sa mise en forme (taille,
+     couleurs, alignement, interlignage, étiquette) en gardant leur texte.
+     ========================================================= */
+  function openUniformDialog(moduleId) {
+    const m = allMods().find((x) => String(x.id) === String(moduleId));
+    if (!m || m.kind !== 'richtext') return;
+    const rows = App.state.rows();
+    if (rows.length < 2) {
+      alert('Il faut au moins deux éléments (lignes) pour uniformiser la mise en forme.');
+      return;
+    }
+    const type = App.schema.Types.richtext;
+    const opts = rows.map((r, i) => {
+      const v = r.cells[m.id];
+      const s = (v && v.title && App.utils.stripHtml(String(v.title))) ||
+        type.summary(v) || '(vide)';
+      return '<option value="' + esc(r.id) + '">Ligne ' + (i + 1) + ' — ' +
+        esc(String(s).slice(0, 50)) + '</option>';
+    }).join('');
+
+    App.modal.open({
+      title: 'Uniformiser le style — ' + (m.label || m.id),
+      html:
+        '<form id="uniform-form" novalidate onsubmit="return false">' +
+        '<p class="hint">Choisissez l\'élément dont la mise en forme servira de modèle. ' +
+        'Seront appliqués à <strong>tous</strong> les éléments de cette réserve : ' +
+        'taille, couleur et position du titre, couleur de l\'étiquette (bandeau), ' +
+        'et pour le contenu : taille, couleur de texte, surlignage, alignement et interlignage. ' +
+        'Chaque élément garde son texte — et reste personnalisable ensuite.</p>' +
+        '<div class="field"><label for="uf-row">Élément modèle</label>' +
+        '<select id="uf-row">' + opts + '</select></div>' +
+        '<div class="form-actions">' +
+          '<button type="button" class="btn" data-close>Annuler</button>' +
+          '<button type="button" class="btn primary" id="uf-apply">Appliquer à tous</button>' +
+        '</div></form>'
+    });
+
+    document.getElementById('uf-apply').addEventListener('click', () => {
+      const rid = document.getElementById('uf-row').value;
+      const src = rows.find((r) => String(r.id) === String(rid));
+      if (!src || !src.cells[m.id]) { alert('L\'élément modèle est vide.'); return; }
+      const sig = src.cells[m.id];
+      const bulk = rows
+        .filter((r) => String(r.id) !== String(src.id) && r.cells[m.id])
+        .map((r) => ({ id: r.id, cells: { [m.id]: App.schema.Types.richtext.uniformize(sig, r.cells[m.id]) } }));
+      if (!bulk.length) { App.modal.close(); return; }
+      App.state.updateRowsBulk(bulk);
+      App.modal.close();
+      renderRows();
+      alert('Mise en forme appliquée à ' + bulk.length + ' élément' + (bulk.length > 1 ? 's' : '') +
+        '. Chacun garde son texte et reste modifiable individuellement.');
     });
   }
 
@@ -1237,7 +1302,16 @@ function onToggleFlattenAll() {
        erratique signalé par le prof). */
     formEl.addEventListener('mousedown', (e) => {
       const btn = e.target.closest('.rte-btn');
-      if (btn) e.preventDefault();
+      if (btn) { e.preventDefault(); return; }
+      /* Menus déroulants et sélecteurs de couleur : on ne peut pas empêcher
+         le changement de focus (il faut pouvoir choisir dans la liste), alors
+         on mémorise la sélection AVANT qu'elle ne soit perdue. */
+      const ctl = e.target.closest('.rte-select, .rte-color-input');
+      if (ctl) {
+        const rteEl = ctl.closest('.rte');
+        const editor = rteEl && rteEl.querySelector('.rte-editor');
+        if (editor) rteRemember(editor);
+      }
     });
     formEl.addEventListener('click', (e) => {
       const imgBtn = e.target.closest('[data-action="rte-image"]');

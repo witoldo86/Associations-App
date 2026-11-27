@@ -242,7 +242,60 @@
         titleHtml: App.schema.Types.richtext.modalTitleHtml(v),
         titleColor: (v && v.titleColor) || '',
         html: '<div class="modal-rich">' + ((v && v.html) ? App.utils.resolveMediaInHtml(v.html) : '') + '</div>'
-      })
+      }),
+      /* ---- OUTIL « UNIFORMISER LE STYLE » ----
+         Le prof choisit un élément modèle ; tous les autres éléments de la
+         même réserve reprennent SA mise en forme (taille, couleur et
+         position du titre, couleur de l'étiquette ; pour le contenu :
+         taille, couleurs texte/surlignage, alignement, interlignage).
+         Chaque élément garde son TEXTE — il reste personnalisable ensuite. */
+      /* Réglages globaux d'un fragment : première occurrence de chaque
+         propriété parmi les attributs style (les réglages posés à
+         l'ensemble du texte se trouvent dans le span enveloppant). */
+      extractFmt: (html, props) => {
+        const out = {};
+        const stRe = /style="([^"]*)"/gi;
+        let st;
+        while ((st = stRe.exec(String(html || ''))) !== null) {
+          props.forEach((p) => {
+            if (p in out) return;
+            const mm = new RegExp('(?:^|;)\\s*' + p + '\\s*:\\s*([^;]+)', 'i').exec(st[1]);
+            if (mm) out[p] = mm[1].trim();
+          });
+          if (props.every((p) => p in out)) break;
+        }
+        return out;
+      },
+      /* Réapplique une mise en forme à un fragment : styles inline retirés,
+         puis tout le contenu enveloppé dans un span portant les réglages
+         (comme l'outil appliqué « à tout le texte » sans sélection). */
+      restyle: (html, fmt) => {
+        const tpl = document.createElement('template');
+        tpl.innerHTML = String(html || '');
+        tpl.content.querySelectorAll('[style]').forEach((el) => el.removeAttribute('style'));
+        const box = document.createElement('div');
+        box.appendChild(tpl.content);
+        const keys = Object.keys(fmt || {});
+        if (keys.length) {
+          const span = document.createElement('span');
+          span.setAttribute('style', keys.map((k) => k + ':' + fmt[k]).join('; '));
+          while (box.firstChild) span.appendChild(box.firstChild);
+          box.appendChild(span);
+        }
+        return App.utils.sanitizeRich(box.innerHTML);
+      },
+      uniformize: (src, dst) => {
+        const T = App.schema.Types.richtext;
+        const props = ['font-size', 'font-family', 'font-weight', 'font-style',
+          'text-align', 'line-height', 'text-decoration', 'color', 'background-color'];
+        const tFmt = T.extractFmt(src && src.title, props);
+        const bFmt = T.extractFmt(src && src.html, props);
+        return {
+          title: T.restyle(dst && dst.title, tFmt),
+          html: T.restyle(dst && dst.html, bFmt),
+          titleColor: (src && src.titleColor) || ''
+        };
+      }
     }
   };
 
