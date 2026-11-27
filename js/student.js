@@ -643,7 +643,12 @@
     }
     const infoTitle = (m.kind === 'richtext' && v && v.title &&
       App.utils.stripHtml(String(v.title))) || modLabel(m);
-    App.modal.open({ title: infoTitle, html: body || '<p>—</p>', wide: m.kind === 'url',
+    /* Titre enrichi dans la fenêtre de lecture : mise en forme reprise
+       (modalTitleHtml retire les couleurs inline si le bandeau est coloré). */
+    const titleHtml = (m.kind === 'richtext' &&
+      typeof App.schema.Types.richtext.modalTitleHtml === 'function')
+      ? App.schema.Types.richtext.modalTitleHtml(v) : '';
+    App.modal.open({ title: infoTitle, titleHtml, html: body || '<p>—</p>', wide: m.kind === 'url',
       titleColor: (m.kind === 'richtext' && v && v.titleColor) || '' });
   }
 

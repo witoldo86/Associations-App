@@ -23,7 +23,11 @@
     /** Modal standard (texte, HTML arbitraire) */
     open(opts) {
       this.close();
-      const title = App.utils.escapeHtml(opts.title || '');
+      /* Le titre peut être fourni en HTML enrichi (titleHtml) — il vient
+         toujours d'un champ sanitisé côté schéma. Sinon : texte brut. */
+      const title = (typeof opts.titleHtml === 'string' && opts.titleHtml)
+        ? opts.titleHtml
+        : App.utils.escapeHtml(opts.title || '');
       /* Étiquette de titre (bandeau supérieur de la fenêtre) : c'est le
          BANDEAU qui prend la couleur choisie par le prof — pas le texte,
          qui garde une couleur lisible (contraste automatique). */

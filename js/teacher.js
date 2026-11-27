@@ -1070,7 +1070,7 @@ function onToggleFlattenAll() {
          natif ne veut alors pas dire couleur noire appliquée. */
       if (field.allowEmpty) {
         return fieldHtml(id, label, `<div class="inline">
-          <input id="${id}_picker" type="color" value="${esc(value||'#000000')}"
+          <input id="${id}_picker" type="color" value="${esc(value||'#ffffff')}"
                  data-color-for="${esc(field.name)}">
           <button type="button" class="btn link" data-clear-color="${esc(field.name)}"
                   title="Revenir à la couleur par défaut">Par défaut</button>
@@ -1078,7 +1078,7 @@ function onToggleFlattenAll() {
           <input id="${id}" data-field="${esc(field.name)}" type="hidden" value="${esc(value||'')}">
         </div>`);
       }
-      return fieldHtml(id, label, `<input id="${id}" data-field="${esc(field.name)}" type="color" value="${esc(value||'#000000')}">`);
+      return fieldHtml(id, label, `<input id="${id}" data-field="${esc(field.name)}" type="color" value="${esc(value || (field.allowEmpty ? '#ffffff' : '#000000'))}">`);
     }
     if (field.type === 'select') {
       const opts = (field.options||[]).map((o) => {
@@ -1200,6 +1200,7 @@ function onToggleFlattenAll() {
               <button type="button" class="rte-btn" data-apply-color="fore" title="Appliquer la couleur choisie" aria-label="Appliquer la couleur choisie">✓</button>
               <label class="rte-color"><input type="color" class="rte-color-input" data-color="back" value="#fef3c7"><span>Surligner</span></label>
               <button type="button" class="rte-btn" data-apply-color="back" title="Appliquer la couleur de surlignage choisie" aria-label="Appliquer le surlignage choisi">✓</button>
+              <button type="button" class="rte-btn" data-clear-hilite="1" title="Enlever totalement le surlignage" aria-label="Enlever totalement le surlignage">⬜</button>
               <span class="rte-sep"></span>
               <button type="button" class="rte-btn" data-action="rte-image" title="Insérer une image">🖼</button>
               <button type="button" class="rte-btn" data-cmd="clear" title="Effacer la mise en forme">✕</button>
@@ -1242,6 +1243,14 @@ function onToggleFlattenAll() {
         }
         return;
       }
+      /* Enlever totalement le surlignage (et pas seulement le changer). */
+      const clearHilite = e.target.closest('[data-clear-hilite]');
+      if (clearHilite) {
+        e.preventDefault();
+        const editor = clearHilite.closest('.rte').querySelector('.rte-editor');
+        rteExec(editor, 'hiliteColor', 'transparent');
+        return;
+      }
       const btn = e.target.closest('.rte-btn');
       if (btn) {
         e.preventDefault();
@@ -1257,7 +1266,7 @@ function onToggleFlattenAll() {
         const hidden = wrap && wrap.querySelector('input[type=hidden][data-field="' + clearColorBtn.dataset.clearColor + '"]');
         const picker = wrap && wrap.querySelector('input[type=color][data-color-for="' + clearColorBtn.dataset.clearColor + '"]');
         if (hidden) hidden.value = '';
-        if (picker) picker.value = '#000000';
+        if (picker) picker.value = '#ffffff';   // blanc = défaut (étiquette sans bandeau coloré)
         return;
       }
       const clearBtn = e.target.closest('[data-clear]');
@@ -1411,6 +1420,10 @@ function onToggleFlattenAll() {
      texte), commande, puis mémorisation de la sélection résultat. */
   function rteExec(editor, cmd, val) {
     rteReadyRange(editor);
+    /* Écriture des couleurs en style inline (span style=…) et non en
+       balises <font> : c'est ce qui permet à la couleur de texte choisie
+       de survivre à l'assainissement à l'enregistrement. */
+    try { document.execCommand('styleWithCSS', false, true); } catch (err) { /* ancien moteur */ }
     document.execCommand(cmd, false, val == null ? null : val);
     rteRemember(editor);
   }

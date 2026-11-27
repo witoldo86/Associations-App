@@ -52,6 +52,21 @@
 
       cleanNode(child);                                       // d'abord les enfants
 
+      /* <font color=… face=…> (forme produite par certains navigateurs
+         pour la couleur de texte) : convertie en <span style=…> au lieu
+         d'être dépliée — sinon la couleur choisie était perdue à
+         l'enregistrement et le texte revenait au noir. */
+      if (child.tagName === 'FONT') {
+        cleanNode(child);
+        const span = document.createElement('span');
+        const color = child.getAttribute('color') || '';
+        const face = child.getAttribute('face') || '';
+        if (color) span.style.color = color;      // validé par le parseur CSS
+        if (face) span.style.fontFamily = face;
+        [...child.childNodes].forEach((n) => span.appendChild(n));
+        child.replaceWith(span);
+        return;
+      }
       if (child.tagName === 'IMG') {
         const alt = child.getAttribute('alt') || '';
         const src = String(child.getAttribute('src') || '').trim();

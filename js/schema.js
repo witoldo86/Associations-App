@@ -217,8 +217,29 @@
           '<div class="rich clamp">' + ((v && v.html) ? App.utils.resolveMediaInHtml(v.html) : '') + '</div>' +
           '</div>';
       },
+      /* Titre enrichi pour la fenêtre de lecture : la mise en forme du
+         titre (taille, police, italique, surlignage…) est reprise. Si le
+         bandeau porte la couleur d'étiquette, les couleurs inline du
+         titre sont retirées — le texte suit le contraste automatique
+         (sinon : texte de la même teinte que le bandeau = illisible). */
+      modalTitleHtml: (v) => {
+        const rich = App.schema.Types.richtext.titleHtmlOf(v);
+        if (!rich) return '';
+        const hasBandeau = !!(v && typeof v.titleColor === 'string' &&
+          /^#[0-9a-fA-F]{3,8}$/.test(v.titleColor));
+        if (!hasBandeau) return rich;
+        const tpl = document.createElement('template');
+        tpl.innerHTML = rich;
+        tpl.content.querySelectorAll('*').forEach((el) => {
+          if (el.style) el.style.removeProperty('color');
+        });
+        const box = document.createElement('div');
+        box.appendChild(tpl.content);
+        return box.innerHTML;
+      },
       open: (v) => App.modal.open({
         title: (v && v.title) ? (App.utils.stripHtml(String(v.title)) || 'Cartel') : 'Cartel',
+        titleHtml: App.schema.Types.richtext.modalTitleHtml(v),
         titleColor: (v && v.titleColor) || '',
         html: '<div class="modal-rich">' + ((v && v.html) ? App.utils.resolveMediaInHtml(v.html) : '') + '</div>'
       })
