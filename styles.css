@@ -1524,3 +1524,12 @@ body.student-mode #s-pools-zone .pool-col.is-expanded .item-image img{
     width:auto; min-width:0; max-width:none;
   }
 }
+
+/* =========================================================
+   DÉCORRÉLATION DES HAUTEURS (maquette)
+   Ouvrir un tiroir n'étire plus les autres blocs : le plateau,
+   les réserves et chaque panneau gardent la hauteur de leur
+   propre contenu (fini l'espace vide sous les modules quand
+   le panneau voisin s'allonge).
+   ========================================================= */
+.mq-main, .mq-beside-row, .mq-canvas{ align-items:flex-start; }
