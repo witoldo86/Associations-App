@@ -1432,7 +1432,7 @@ body.student-mode #s-pools-zone .pool-col.is-expanded .item-image img{
    ouvre / referme. Les classes mq-zone mq-side + data-zone
    sont conservées (dépôt des modules par glisser-déposer).
    ========================================================= */
-.mq-drawer{ padding:.35rem .4rem; }
+.mq-drawer{ position:relative; padding:.35rem .4rem; }
 .mq-drawer.is-closed{ min-height:0; padding-bottom:.35rem; }
 .mq-drawer-head-row{ display:flex; align-items:center; gap:.3rem; }
 .mq-drawer-head{
@@ -1509,7 +1509,7 @@ body.student-mode #s-pools-zone .pool-col.is-expanded .item-image img{
 /* Tiroirs latéraux : largeur verrouillée — ouvrir un tiroir
    allonge la colonne mais ne déforme jamais le plateau. */
 .mq-main .mq-zone.mq-side, .mq-canvas .mq-zone.mq-side, .mq-beside-row .mq-zone.mq-side{
-  flex:0 0 200px; width:200px; min-width:200px; max-width:200px; overflow:hidden;
+  flex:0 0 200px; width:200px; min-width:200px; max-width:200px;
 }
 
 /* Contours continus (pas de pointillés) pour la réserve et
@@ -1535,13 +1535,21 @@ body.student-mode #s-pools-zone .pool-col.is-expanded .item-image img{
 .mq-main, .mq-beside-row, .mq-canvas{ align-items:flex-start; }
 
 /* =========================================================
-   TIROIRS : PAS D'ABAISSEMENT DE LA RÉSERVE DU BAS
-   Hors mode « pleine hauteur », le corps d'un tiroir ouvert ne
-   dépasse pas la hauteur de la bande qu'il flanque (plateau ou
-   réserves, mesurée et transmise via --mq-row-h) : le trop-plein
-   défile à l'intérieur du tiroir, rien ne bouge en dessous.
+   TIROIRS : DÉROULÉ PAR-DESSUS LE CONTENU (menu)
+   Hors mode « pleine hauteur », le corps d'un tiroir ouvert
+   se déplie PAR-DESSUS ce qui se trouve en dessous, comme un
+   menu déroulant : il peut être aussi haut que nécessaire
+   (défilement interne au-delà d'environ 60 % de l'écran) et
+   RIEN ne bouge jamais en dessous — ni plateau, ni panneau
+   voisin, ni réserve du bas. Compromis assumé : tant qu'un
+   tiroir est ouvert, il masque la zone située dessous ; on
+   la retrouve en refermant le tiroir (clic sur l'en-tête).
    ========================================================= */
+.mq-screen:not(.mq-mode-both) .mq-drawer.is-open{ z-index:40; }
 .mq-screen:not(.mq-mode-both) .mq-drawer.is-open .mq-drawer-body{
-  max-height:calc(var(--mq-row-h, 360px) - 2.6rem);
-  overflow-y:auto;
+  position:absolute; top:100%; left:0; right:0; z-index:40;
+  margin-top:.25rem; padding:.5rem;
+  background:#fff; border:1px solid var(--line); border-radius:10px;
+  box-shadow:0 10px 24px rgba(15,23,42,.18);
+  max-height:min(60vh, 520px); overflow-y:auto;
 }
