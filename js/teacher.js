@@ -840,25 +840,15 @@ function onToggleFlattenAll() {
   }
 
   /* Ligne compacte (vue synthétique) : une vignette par module, sans boîte
-     détaillée — image en vignette, texte en gras, même clic pour éditer. */
+     détaillée — image en vignette, texte en gras, même clic pour éditer.
+     SANS les boutons ↑↓ ✎ 🗑 : ils restent dans la vue détaillée. */
   function rowCompactHtml(r, i) {
     const mods = allMods().filter((m) => m.role === 'associate');
     const cellsHtml = mods.map((m) => compactCellHtml(m, r.cells[m.id])).join('');
     const isSel = String(r.id) === String(selectedRowId);
-    const total = App.state.rows().length;
     return `
       <li class="triplet-item${isSel ? ' selected' : ''}" data-row-id="${esc(r.id)}">
         <div class="triplet-body">
-          <div class="row-tools">
-            <button type="button" class="btn small" data-row-act="up" title="Monter"
-                    aria-label="Monter cette ligne" ${i === 0 ? 'disabled' : ''}>↑</button>
-            <button type="button" class="btn small" data-row-act="down" title="Descendre"
-                    aria-label="Descendre cette ligne" ${i === total-1 ? 'disabled' : ''}>↓</button>
-            <button type="button" class="btn small" data-row-act="edit" title="Modifier"
-                    aria-label="Modifier cette ligne">✎</button>
-            <button type="button" class="btn small danger" data-row-act="del" title="Supprimer"
-                    aria-label="Supprimer cette ligne">🗑</button>
-          </div>
           <div class="row-cells compact">${cellsHtml || '<em class="muted">ligne vide</em>'}</div>
         </div>
       </li>`;
