@@ -1533,3 +1533,15 @@ body.student-mode #s-pools-zone .pool-col.is-expanded .item-image img{
    le panneau voisin s'allonge).
    ========================================================= */
 .mq-main, .mq-beside-row, .mq-canvas{ align-items:flex-start; }
+
+/* =========================================================
+   TIROIRS : PAS D'ABAISSEMENT DE LA RÉSERVE DU BAS
+   Hors mode « pleine hauteur », le corps d'un tiroir ouvert ne
+   dépasse pas la hauteur de la bande qu'il flanque (plateau ou
+   réserves, mesurée et transmise via --mq-row-h) : le trop-plein
+   défile à l'intérieur du tiroir, rien ne bouge en dessous.
+   ========================================================= */
+.mq-screen:not(.mq-mode-both) .mq-drawer.is-open .mq-drawer-body{
+  max-height:calc(var(--mq-row-h, 360px) - 2.6rem);
+  overflow-y:auto;
+}

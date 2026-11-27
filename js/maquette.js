@@ -142,6 +142,7 @@
     root.addEventListener('input', onFieldInput);
     root.addEventListener('change', onFieldInput);
     root.addEventListener('click', onClick);
+    window.addEventListener('resize', syncDrawerCap);
 
     App.state.onChange(() => {
       if (applyTimer) { clearTimeout(applyTimer); applyTimer = null; }
@@ -479,6 +480,8 @@
        réserves »), on aligne quand même le plateau sur la bande centrale
        (classe utilisée par le CSS) pour que réserves et plateau aient la
        même longueur. */
+    /* marqueur de mode pour le CSS (plafonnement des tiroirs) */
+    const screenCls = 'mq-screen' + (asideMode === 'both' ? ' mq-mode-both' : '');
     const mainRow = '<div class="mq-main' + (asideMode === 'pools' ? ' mq-main-solo' : '') + '">' +
       (asideMode === 'board' ? leftZone : '') + columnsZone +
       (asideMode === 'board' ? rightZone : '') + '</div>';
@@ -488,7 +491,7 @@
       rightZone + '</div>';
 
     $('#mq-preview').innerHTML =
-      '<div class="mq-screen" style="' + esc(style) + '">' +
+      '<div class="' + screenCls + '" style="' + esc(style) + '">' +
         '<div class="mq-title">' + esc(draft.title || 'Titre') +
           editBtn('title', 'Modifier le titre (texte, taille, couleur, police)') + '</div>' +
         '<div class="mq-subtitle">' + esc(App.utils.stripHtml(draft.subtitle)) +
@@ -506,6 +509,25 @@
       '</div>' +
       zoneHtml('hidden', 'Modules masqués (non affichés à l\'élève)', inZone('hidden').map(moduleChip).join(''), 'mq-hidden mq-cards') +
       zoneHtml('rows', 'Ordre des lignes', rowChips(), 'mq-rows', '', SHUFFLE_BTN);
+    syncDrawerCap();
+  }
+
+  /* Plafonne le corps des tiroirs ouverts à la hauteur de la bande qu'ils
+     flanquent (plateau ou réserves) : ouvrir un tiroir n'abaisse plus la
+     zone de réserves du bas — le trop-plein défile à l'intérieur.
+     (Inutile en mode « pleine hauteur » : les tiroirs encadrent tout.) */
+  function syncDrawerCap() {
+    const screen = root && root.querySelector('#mq-preview .mq-screen');
+    if (!screen) return;
+    if (screen.classList.contains('mq-mode-both')) {
+      screen.style.removeProperty('--mq-row-h');
+      return;
+    }
+    const driver = screen.querySelector('.mq-beside-row .mq-zone.mq-pools') ||
+      screen.querySelector('.mq-main .mq-zone.mq-board');
+    const h = driver ? driver.offsetHeight : 0;
+    if (h > 0) screen.style.setProperty('--mq-row-h', h + 'px');
+    else screen.style.removeProperty('--mq-row-h');
   }
 
   /* =========================================================
