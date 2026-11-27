@@ -89,6 +89,13 @@
     bind();
     S.reset();
     App.state.onChange(() => S.reset());
+    /* La vue élève peut être re-rendue pendant qu'elle est cachée (le prof
+       modifie la maquette) : on retente le figage des vignettes dès que la
+       vue redevient visible (bascule student-mode sur <body>). */
+    if (typeof MutationObserver !== 'undefined') {
+      new MutationObserver(() => tryFreezePending())
+        .observe(document.body, { attributes: true, attributeFilter: ['class'] });
+    }
   };
 
   function bind() {
@@ -286,8 +293,12 @@
      tiennent par ligne dans la disposition voulue par le prof, puis on
      bascule le bac en grille « N par ligne » : les vignettes gardent
      ensuite exactement la même taille du début à la fin de l'exercice,
-     même quand il ne reste que très peu d'éléments dans le bac. */
+     même quand il ne reste que très peu d'éléments dans le bac.
+     IMPORTANT : la mesure n'a de sens que si le bac est réellement
+     affiché (vue élève visible) — dans une vue cachée tous les offsets
+     valent 0 et tout semblerait tenir sur une seule ligne. */
   function freezePoolColumns(pool) {
+    if (pool.closest('[hidden]')) return;   // vue pas encore affichée : on réessaiera
     const items = Array.prototype.slice.call(pool.querySelectorAll(':scope > .item'));
     if (!items.length) return;
     let perRow = 1;
@@ -299,6 +310,25 @@
     frozenPools[pool.id] = true;
     pool.classList.add('is-gridded');
     pool.style.setProperty('--pool-cols', perRow);
+  }
+
+  /* Conditions de figage partagées entre render() et les nouvelles tentatives */
+  function freezeEligible(m, pool) {
+    return !m.poolCols && !frozenPools[pool.id] && board && board.keys[m.id] &&
+      board.keys[m.id].length &&
+      board.keys[m.id].every((k) => board.placement[k] === null) &&
+      !(moduleState[m.id] && moduleState[m.id].locked);
+  }
+
+  /* Réessaie de figer les bacs restés non mesurés : la vue élève peut être
+     re-rendue pendant qu'elle est cachée (quand le prof modifie la maquette),
+     auquel cas la mesure était impossible. On retente dès qu'elle redevient
+     visible (bascule de mode), tant qu'aucun élément n'a été déposé. */
+  function tryFreezePending() {
+    assocMods().forEach((m) => {
+      const pool = document.getElementById('pool-' + cssId(m.id));
+      if (pool && freezeEligible(m, pool)) freezePoolColumns(pool);
+    });
   }
 
   function poolHtml(moduleId) {
@@ -342,11 +372,7 @@
            le nombre d'éléments par ligne relevé à ce moment ne change plus,
            même quand le bac se vide. (Inutile si le prof a déjà imposé un
            « N par ligne » : la grille est alors figée par construction.) */
-        if (!m.poolCols && !frozenPools[pool.id] &&
-            board.keys[m.id] && board.keys[m.id].length &&
-            board.keys[m.id].every((k) => board.placement[k] === null)) {
-          freezePoolColumns(pool);
-        }
+        if (freezeEligible(m, pool)) freezePoolColumns(pool);
       }
     });
     updatePreviewButtons();
