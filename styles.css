@@ -1492,3 +1492,35 @@ body.student-mode #s-pools-zone .pool-col.is-expanded .item-image img{
    ========================================================= */
 .info-sidebar .item-image{ width:100%; height:110px; max-width:100%; }
 .info-sidebar .item-image img{ width:100%; height:100%; object-fit:cover; display:block; }
+
+/* =========================================================
+   MAQUETTE : RÉSERVES ET PLATEAU DANS LA MÊME BANDE
+   Les zones de réserves posées au-dessus / en dessous (hors
+   mode « pleine hauteur ») sont alignées sur la bande
+   centrale : même longueur que le plateau, entre les tiroirs.
+   ========================================================= */
+.mq-screen > .mq-zone.mq-pools{
+  margin-left:calc(200px + .5rem); margin-right:calc(200px + .5rem);
+}
+.mq-main-solo .mq-zone.mq-board{
+  margin-left:calc(200px + .5rem); margin-right:calc(200px + .5rem);
+}
+
+/* Tiroirs latéraux : largeur verrouillée — ouvrir un tiroir
+   allonge la colonne mais ne déforme jamais le plateau. */
+.mq-main .mq-zone.mq-side, .mq-canvas .mq-zone.mq-side, .mq-beside-row .mq-zone.mq-side{
+  flex:0 0 200px; width:200px; min-width:200px; max-width:200px; overflow:hidden;
+}
+
+/* Contours continus (pas de pointillés) pour la réserve et
+   les blocs qu'elle contient, comme pour le plateau. */
+.mq-zone.mq-pools{ border-style:solid; border-color:var(--primary); }
+.mq-chip-pools{ border-style:solid; }
+.mq-mini{ border-style:solid; }
+
+@media (max-width:900px){
+  .mq-screen > .mq-zone.mq-pools, .mq-main-solo .mq-zone.mq-board{ margin-left:0; margin-right:0; }
+  .mq-main .mq-zone.mq-side, .mq-canvas .mq-zone.mq-side, .mq-beside-row .mq-zone.mq-side{
+    width:auto; min-width:0; max-width:none;
+  }
+}

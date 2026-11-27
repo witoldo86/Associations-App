@@ -475,7 +475,11 @@
     const rightZone = sideDrawerHtml('right', 'Panneau droit');
     const columnsZone = zoneHtml('columns', 'Plateau — colonnes à associer (dans l\'ordre)',
       boardInner, 'mq-board', '', GRID_BTN);
-    const mainRow = '<div class="mq-main">' +
+    /* Quand les tiroirs n'entourent pas le plateau (mode « à côté des
+       réserves »), on aligne quand même le plateau sur la bande centrale
+       (classe utilisée par le CSS) pour que réserves et plateau aient la
+       même longueur. */
+    const mainRow = '<div class="mq-main' + (asideMode === 'pools' ? ' mq-main-solo' : '') + '">' +
       (asideMode === 'board' ? leftZone : '') + columnsZone +
       (asideMode === 'board' ? rightZone : '') + '</div>';
     const besideRow = '<div class="mq-beside-row">' +
