@@ -142,6 +142,7 @@
     root.addEventListener('input', onFieldInput);
     root.addEventListener('change', onFieldInput);
     root.addEventListener('click', onClick);
+    root.addEventListener('dblclick', onDblClick);
 
     App.state.onChange(() => {
       if (applyTimer) { clearTimeout(applyTimer); applyTimer = null; }
@@ -197,6 +198,19 @@
     setVal(key, (key === 'boardCols' || key === 'poolsCols') ? gridN(el.value) : el.value);
     renderPreview();
     scheduleApply();
+  }
+
+  /* Double-clic sur un bloc de module (plateau, tiroirs, masqués) ou sur un
+     bloc de réserve : ouvre la fenêtre d'édition à onglets du module. */
+  function onDblClick(e) {
+    const chip = e.target.closest('.mq-mini, .mq-chip-module');
+    if (!chip || !root.contains(chip)) return;
+    if (chip.dataset.dragKind !== 'module') return;
+    const id = chip.dataset.dragId;
+    if (!id || !App.teacher) return;
+    e.preventDefault();
+    e.stopPropagation();
+    App.teacher.editModule(id);
   }
 
   function onClick(e) {
@@ -308,6 +322,11 @@
   const GRID_BTN = '<button type="button" class="mq-edit" data-mq-dialog="grid" ' +
     'title="Grille : modules par ligne (plateau et réserves)">⌗</button>';
 
+  /* Bloc d'un module du plateau ou d'une zone latérale/masquée.
+     Les boutons ✎ 📝 📄 🗑 ne restent que dans les zones latérales (tiroirs)
+     et « Modules masqués » — le tableau de bord est allégé. Partout ailleurs
+     (plateau, réserves), le DOUBLE-CLIC sur le bloc ouvre la fenêtre d'édition
+     à onglets (Module / Présentation / Contenu du pool). */
   function moduleChip(m, showWidth) {
     const span = Number(m.span) || 1;
     const style = showWidth
@@ -315,12 +334,13 @@
     const badge = showWidth ? '' : '<span class="badge">' + esc(kindLabel(m)) + '</span>';
     const lock = (m.unlockAfter && m.unlockAfter.length)
       ? ' <span class="badge" title="Verrou pédagogique actif">🔒</span>' : '';
+    const actions = showWidth ? '' : chipActions(m.id, false, m.role !== 'associate');
     return '<div class="mq-chip mq-chip-module' + (m.role === 'associate' ? ' is-assoc' : '') +
       '" data-drag-kind="module" data-drag-id="' + esc(m.id) + '" title="' + esc(m.id) + '"' + style + '>' +
       '<span class="mq-grip" aria-hidden="true">⣿</span>' +
       '<span class="mq-name">' + esc(modLabel(m)) + '</span>' +
       badge + lock +
-      chipActions(m.id, false, m.role !== 'associate') + '</div>';
+      actions + '</div>';
   }
 
   function zoneHtml(name, title, inner, cls, itemsAttr, labelExtra) {
@@ -430,12 +450,14 @@
         m.poolColor ? 'background:' + esc(m.poolColor) : ''
       ].filter(Boolean).join(';');
       /* Nom du pool : centré, tronqué avec « … » si trop long
-         (text-overflow ne fonctionne pas directement sur un conteneur flex). */
+         (text-overflow ne fonctionne pas directement sur un conteneur flex).
+         Plus de boutons sur les blocs des réserves : le double-clic ouvre
+         la fenêtre d'édition à onglets (couleur du bac → onglet Présentation). */
       return '<span class="mq-mini" data-drag-kind="module" data-drag-id="' + esc(m.id) +
         '" data-span-id="' + esc(m.id) + '"' +
         (st ? ' style="' + st + '"' : '') +
-        ' title="' + esc(m.id) + '"><span class="mq-mini-label" title="' + esc(modLabel(m)) + '">' +
-        esc(modLabel(m)) + '</span>' + chipActions(m.id, true) + '</span>';
+        ' title="' + esc(m.id) + ' — double-cliquez pour régler ce module"><span class="mq-mini-label" title="' + esc(modLabel(m)) + '">' +
+        esc(modLabel(m)) + '</span></span>';
     };
     let poolsInner;
     let poolsMiniAttr = '';

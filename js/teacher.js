@@ -358,9 +358,32 @@
           </div>
         </fieldset>`
       : '';
+
+    /* L'option « cliquable » ne concerne que les modules informatifs :
+       elle est grisée (désactivée) tant que le rôle n'est pas « Informatif »,
+       et réactivée en direct si le prof change le rôle. */
+    const currentRole = m ? m.role : (presetRole || 'associate');
+
+    /* Onglet « Contenu du pool » : vue d'ensemble en lecture seule des
+       contenus déjà saisis (mêmes éléments que la fenêtre 📄 de la maquette). */
+    const overviewHtml = isNew
+      ? '<p class="hint">Enregistrez d\'abord le module (bouton « Ajouter ») pour pouvoir saisir son contenu.</p>'
+      : (m.role === 'informative'
+        ? '<div class="module-contents"><div class="mini-info-head">Contenu du panneau d\'information</div>' +
+          '<div class="mini-info">' + esc(String(infoOverviewSummary(m)).slice(0, 400)) + '</div>' +
+          '<p class="hint">Un seul contenu, indépendant des lignes — éditez-le avec le bouton ' +
+          '\ud83d\udcdd du bloc dans la maquette, ou via la fenêtre de visualisation des contenus.</p></div>'
+        : '<div class="module-contents">' + moduleItemsHtml(m).html + '</div>');
+
     return `
+    <div class="modal-tabs" id="mf-tabs" role="tablist">
+      <button type="button" class="modal-tab is-active" data-tab="module">Module</button>
+      <button type="button" class="modal-tab" data-tab="present">Présentation</button>
+      <button type="button" class="modal-tab" data-tab="contents">Contenu du pool</button>
+    </div>
     <form id="module-form" novalidate>
       <input id="mf-zone" type="hidden" value="${zoneOk ? esc(zone) : ''}">
+      <div class="modal-tabpane is-active" data-pane="module">
       <div class="inline">
         <div class="field">
           <label>Identifiant technique (facultatif — déduit du libellé si vide)</label>
@@ -382,15 +405,8 @@
         <div class="field">
           <label>Rôle</label>
           <select id="mf-role">
-            <option value="associate" ${presetRole ? presetRole==='associate' ? 'selected' : '' : (!m||m.role==='associate'?'selected':'')}>À associer (colonne du plateau)</option>
-            <option value="informative" ${presetRole ? presetRole==='informative' ? 'selected' : '' : (m&&m.role==='informative'?'selected':'')}>Informatif (panneau latéral)</option>
-          </select>
-        </div>
-        <div class="field">
-          <label>Éléments par ligne dans le bac (réserve)</label>
-          <select id="mf-poolcols">
-            <option value="" ${!(m&&m.poolCols)?'selected':''}>Auto — ils remplissent la largeur du bac</option>
-            ${[1,2,3,4].map((n) => '<option value="' + n + '" ' + (m && m.poolCols === n ? 'selected' : '') + '>' + n + ' par ligne (contenu adapté)</option>').join('')}
+            <option value="associate" ${currentRole==='associate'?'selected':''}>À associer (colonne du plateau)</option>
+            <option value="informative" ${currentRole==='informative'?'selected':''}>Informatif (panneau latéral)</option>
           </select>
         </div>
       </div>
@@ -405,13 +421,33 @@
             </label>`).join('') || '<span class="hint">Aucun autre module.</span>'}
         </div>
       </div>
-      <div class="field">
+      <div class="field" id="mf-clickable-row">
         <label class="inline" style="gap:.45rem">
           <input id="mf-clickable" type="checkbox" ${m && m.clickable ? 'checked' : ''}>
-          Cliquable chez l'élève (modules informatifs : ouvre le contenu en grand dans une fenêtre)
+          Cliquable chez l'élève — ouvre le contenu en grand dans une fenêtre
+          (uniquement pour les modules informatifs des panneaux latéraux)
         </label>
       </div>
       ${revealBlock}
+      </div>
+      <div class="modal-tabpane" data-pane="present" hidden>
+      <div class="field">
+        <label>Éléments par ligne dans le bac (réserves)</label>
+        <select id="mf-poolcols">
+          <option value="" ${!(m&&m.poolCols)?'selected':''}>Auto — ils remplissent la largeur du bac</option>
+          ${[1,2,3,4].map((n) => '<option value="' + n + '" ' + (m && m.poolCols === n ? 'selected' : '') + '>' + n + ' par ligne (contenu adapté)</option>').join('')}
+        </select>
+        <div class="mf-grid-preview" id="mf-grid-preview" title="Aperçu de la disposition dans le bac"></div>
+        <div class="hint" style="margin-top:.3rem">Miniature indicative : la disposition réelle dépend aussi
+          de la largeur du bac et des largeurs réglées dans la maquette.</div>
+      </div>
+      <div class="field">
+        <label>Couleur de fond du bac (réserves de l'élève)</label>
+        <div class="inline" style="gap:.5rem; align-items:center">
+          <input id="mf-poolcolor" type="color" value="${esc((m && m.poolColor) || '#ffffff')}" style="width:2.4rem; height:1.6rem; padding:0">
+          <button type="button" class="btn" id="mf-poolcolor-clear" title="Revenir à la couleur par défaut (aucune teinte)">Par défaut</button>
+        </div>
+      </div>
       <div class="field" id="mf-pooltitle-row">
           <label class="inline" style="gap:.45rem">
             <input id="mf-pooltitle" type="checkbox" ${m && m.kind === 'richtext' && m.poolTitleOnly ? 'checked' : ''}>
@@ -435,12 +471,24 @@
             <option value="title" ${(m && m.infoMode === 'title') ? 'selected' : ''}>Seulement le titre — un clic ouvre la fenêtre du contenu</option>
           </select>
         </div>
-        <p class="hint">Contenu informatif : un seul contenu, indépendant des lignes, édité avec le bouton 📝 du bloc dans la maquette.</p>` : ''}
+        <p class="hint">Contenu informatif : un seul contenu, indépendant des lignes, édité avec le bouton \ud83d\udcdd du bloc dans la maquette.</p>` : ''}
+      </div>
+      <div class="modal-tabpane" data-pane="contents" hidden>
+        ${overviewHtml}
+      </div>
       <div class="form-actions">
         <button type="submit" class="btn primary" id="mf-save">${isNew ? 'Ajouter' : 'Enregistrer'}</button>
         <button type="button" class="btn" id="mf-cancel">Annuler</button>
       </div>
     </form>`;
+  }
+
+  /* Résumé du contenu d'un module informatif (onglet « Contenu du pool »). */
+  function infoOverviewSummary(m) {
+    const type = App.schema.Types[m.kind];
+    const v = m.data;
+    if (v == null || (type.validate && !type.validate(v))) return '(vide)';
+    return type.summary(v) || '(contenu)';
   }
 
   function bindModuleForm() {
@@ -450,6 +498,61 @@
       e.preventDefault();
       saveModule();
     });
+    /* Navigation entre onglets (Module / Présentation / Contenu du pool). */
+    const tabs = document.getElementById('mf-tabs');
+    if (tabs) tabs.addEventListener('click', (e) => {
+      const b = e.target.closest('.modal-tab');
+      if (!b) return;
+      tabs.querySelectorAll('.modal-tab').forEach((x) => x.classList.toggle('is-active', x === b));
+      document.querySelectorAll('#module-form .modal-tabpane').forEach((p) => {
+        const active = p.dataset.pane === b.dataset.tab;
+        p.classList.toggle('is-active', active);
+        p.hidden = !active;
+      });
+    });
+    /* L'option « cliquable » ne vaut que pour les modules informatifs :
+       grisée tant que le rôle n'est pas « Informatif ». */
+    const roleSel = document.getElementById('mf-role');
+    const clickCb = document.getElementById('mf-clickable');
+    const clickRow = document.getElementById('mf-clickable-row');
+    const syncClickable = () => {
+      const info = roleSel.value === 'informative';
+      if (clickCb) clickCb.disabled = !info;
+      if (clickRow) {
+        clickRow.classList.toggle('is-disabled', !info);
+        clickRow.title = info ? '' : 'Option réservée aux modules informatifs (panneaux latéraux) — le rôle est « À associer ».';
+      }
+    };
+    if (roleSel) roleSel.addEventListener('change', syncClickable);
+    syncClickable();
+    /* Miniature de la disposition (onglet Présentation) : mise à jour en direct. */
+    const colsSel = document.getElementById('mf-poolcols');
+    if (colsSel) colsSel.addEventListener('change', renderGridPreview);
+    renderGridPreview();
+    /* Couleur de fond du bac : bouton « Par défaut » = blanc, aucune teinte. */
+    const pcClear = document.getElementById('mf-poolcolor-clear');
+    if (pcClear) pcClear.addEventListener('click', () => {
+      const pc = document.getElementById('mf-poolcolor');
+      if (pc) pc.value = '#ffffff';
+    });
+  }
+
+  /* Miniature de l'onglet Présentation : montre la disposition des éléments
+     du bac selon le choix « éléments par ligne » (Auto / 1 à 4). */
+  function renderGridPreview() {
+    const box = document.getElementById('mf-grid-preview');
+    const sel = document.getElementById('mf-poolcols');
+    if (!box || !sel) return;
+    const me = editingModuleId;
+    const assoc = allMods().filter((x) => x.role === 'associate' && (!me || x.id !== me));
+    const n = Number(sel.value) || 0;
+    const cells = assoc.map((mm) => ({ label: mm.label || mm.id, self: false }));
+    cells.push({ label: 'Ce module', self: true });
+    box.classList.toggle('is-grid', n >= 1 && cells.length > 1);
+    box.style.gridTemplateColumns = n >= 1 ? 'repeat(' + n + ', 1fr)' : '';
+    box.innerHTML = cells.map((c) =>
+      '<span class="mf-grid-box' + (c.self ? ' is-self' : '') + '" title="' + esc(c.label) + '">' +
+      esc(c.label) + '</span>').join('');
   }
 
   function hideModuleForm() {
@@ -520,8 +623,16 @@
     const revealChecked = [...document.querySelectorAll('input[data-reveal-row]:checked')]
       .map((x) => x.dataset.revealRow);
     const poolTitleEl = document.getElementById('mf-pooltitle');
+    /* Couleur de fond du bac (onglet Présentation) : '' = pas de teinte.
+       Appliquée côte élève via --pool-color ; le bouton 🎨 des réserves
+       disparaît de la maquette — c'est ici qu'on la règle désormais. */
+    const poolColorEl = document.getElementById('mf-poolcolor');
+    const poolColorRaw = poolColorEl ? String(poolColorEl.value || '').trim().toLowerCase() : '';
+    /* Blanc = aucune teinte (fond par défaut déjà blanc) */
+    const poolColor = (poolColorRaw && poolColorRaw !== '#ffffff') ? poolColorRaw : '';
     const payload = { id, label, kind, role, unlockAfter,
       poolCols: poolColsRaw ? Number(poolColsRaw) : null,
+      poolColor: role === 'associate' ? poolColor : '',
       poolTitleOnly: kind === 'richtext' && !!(poolTitleEl && poolTitleEl.checked),
       poolTitleStyle: kind === 'richtext' &&
         !!(document.getElementById('mf-pooltitlestyle') && document.getElementById('mf-pooltitlestyle').checked),
@@ -567,9 +678,10 @@
   /* =========================================================
      APERÇU DES CONTENUS D'UN MODULE (modal)
      ========================================================= */
-  function showModuleContents(moduleId) {
-    const m = allMods().find((x) => x.id === moduleId);
-    if (!m) return;
+  /* Générateur d'éléments « contenus en place » : partagé entre la fenêtre
+     📄 de la maquette (showModuleContents) et l'onglet « Contenu du pool »
+     de la modale d'édition du module (vue d'ensemble en lecture seule). */
+  function moduleItemsHtml(m) {
     const type = App.schema.Types[m.kind];
     const rows = App.state.rows();
 
@@ -577,13 +689,9 @@
       const v = m.data;
       const ok = v != null && type.validate && type.validate(v);
       const s = ok ? (type.summary(v) || '(contenu)') : '(vide)';
-      App.modal.open({
-        title: (m.label || m.id) + ' — contenu du panneau',
-        html: '<div class="module-contents">' +
-          '<div class="mini-info-head">' + (ok ? 'Défini' : 'Vide') + '</div>' +
-          '<div class="mini-info">' + esc(String(s).slice(0, 400)) + '</div></div>'
-      });
-      return;
+      return { count: ok ? 1 : 0,
+        html: '<div class="mini-info-head">' + (ok ? 'Défini' : 'Vide') + '</div>' +
+          '<div class="mini-info">' + esc(String(s).slice(0, 400)) + '</div>' };
     }
 
     let count = 0;
@@ -630,6 +738,31 @@
       const s = v == null ? '' : (type.summary(v) || '');
       return num + '<div class="mini-info">' + esc(s || '(vide)') + '</div>';
     }).join('<hr>');
+    return { count, html: items };
+  }
+
+  function showModuleContents(moduleId) {
+    const m = allMods().find((x) => x.id === moduleId);
+    if (!m) return;
+    const rows = App.state.rows();
+
+    if (m.role === 'informative') {
+      const type = App.schema.Types[m.kind];
+      const v = m.data;
+      const ok = v != null && type.validate && type.validate(v);
+      const s = ok ? (type.summary(v) || '(contenu)') : '(vide)';
+      App.modal.open({
+        title: (m.label || m.id) + ' — contenu du panneau',
+        html: '<div class="module-contents">' +
+          '<div class="mini-info-head">' + (ok ? 'Défini' : 'Vide') + '</div>' +
+          '<div class="mini-info">' + esc(String(s).slice(0, 400)) + '</div></div>'
+      });
+      return;
+    }
+
+    const built = moduleItemsHtml(m);
+    const count = built.count;
+    const items = built.html;
 
     const uniformBtn = (m.kind === 'richtext' && rows.length > 1)
       ? '<div class="form-actions"><button type="button" class="btn" id="mc-uniform" ' +
@@ -644,6 +777,7 @@
     const ub = document.getElementById('mc-uniform');
     if (ub) ub.addEventListener('click', () => openUniformDialog(m.id));
   }
+
 
   /* =========================================================
      UNIFORMISER LE STYLE — tous les éléments d'une même réserve
