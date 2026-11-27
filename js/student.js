@@ -13,6 +13,8 @@
   let drag = null;
   let viewed = {};        // { [moduleId]: Set(keys) }
   let moduleState = {};   // { [moduleId]: { locked, deps } }
+  // Bacs dont la taille des vignettes est déjà figée (voir freezePoolColumns)
+  const frozenPools = {};
   let expandedModuleId = null;
   let hoverEl = null;
   let moveFrame = 0;
@@ -206,6 +208,7 @@
     expandedModuleId = null;
 
     viewed = {};
+    Object.keys(frozenPools).forEach((k) => { delete frozenPools[k]; });
     mods.forEach((m) => { viewed[m.id] = new Set(); });
     buildBoard();
     renderInfoSidebars();
@@ -278,6 +281,26 @@
      il ne disparaît qu'une fois la dernière copie déposée. */
   const sigOf = (v) => JSON.stringify(v == null ? null : v);
 
+  /* Taille des vignettes figée au départ (bacs en mode « Auto »).
+     Au premier affichage du bac complet, on relève combien d'éléments
+     tiennent par ligne dans la disposition voulue par le prof, puis on
+     bascule le bac en grille « N par ligne » : les vignettes gardent
+     ensuite exactement la même taille du début à la fin de l'exercice,
+     même quand il ne reste que très peu d'éléments dans le bac. */
+  function freezePoolColumns(pool) {
+    const items = Array.prototype.slice.call(pool.querySelectorAll(':scope > .item'));
+    if (!items.length) return;
+    let perRow = 1;
+    const firstTop = items[0].offsetTop;
+    for (let i = 1; i < items.length; i++) {
+      if (Math.abs(items[i].offsetTop - firstTop) <= 1) perRow++;
+      else break;
+    }
+    frozenPools[pool.id] = true;
+    pool.classList.add('is-gridded');
+    pool.style.setProperty('--pool-cols', perRow);
+  }
+
   function poolHtml(moduleId) {
     const unplaced = board.keys[moduleId].filter((k) => board.placement[k] === null);
     const reps = new Map();
@@ -315,6 +338,15 @@
           'Ouvrez d’abord les éléments requis (' + progress + ').</p>';
       } else {
         pool.innerHTML = poolHtml(m.id);
+        /* Figé la taille des vignettes au premier affichage du bac complet :
+           le nombre d'éléments par ligne relevé à ce moment ne change plus,
+           même quand le bac se vide. (Inutile si le prof a déjà imposé un
+           « N par ligne » : la grille est alors figée par construction.) */
+        if (!m.poolCols && !frozenPools[pool.id] &&
+            board.keys[m.id] && board.keys[m.id].length &&
+            board.keys[m.id].every((k) => board.placement[k] === null)) {
+          freezePoolColumns(pool);
+        }
       }
     });
     updatePreviewButtons();
