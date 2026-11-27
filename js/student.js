@@ -463,8 +463,10 @@
         const type = App.schema.Types[m.kind];
         const head = '<div class="info-module"><h4>' + esc(modLabel(m)) + '</h4>';
         if (m.infoMode === 'title') {
+          const dv = infoDataOf(m);
+          const tc = (dv && dv.titleColor) ? ' style="color:' + esc(dv.titleColor) + '"' : '';
           return head +
-            '<button type="button" class="info-title-link info-item-clickable" data-info-module="' + esc(m.id) + '"' +
+            '<button type="button" class="info-title-link info-item-clickable" data-info-module="' + esc(m.id) + '"' + tc +
             ' title="Afficher en grand">' + esc(infoTitleOf(m)) + '</button></div>';
         }
         const rendered = type.render(m.data, { key: 'info_' + m.id, static: true });

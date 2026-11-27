@@ -1043,6 +1043,19 @@ function onToggleFlattenAll() {
       return fieldHtml(id, label, `<input id="${id}" data-field="${esc(field.name)}" type="url" value="${esc(value)}" placeholder="https://…">`);
     }
     if (field.type === 'color') {
+      /* Variante réinitialisable (allowEmpty) : la couleur « par défaut »
+         est représentée par une valeur vide — une pastille noire du sélecteur
+         natif ne veut alors pas dire couleur noire appliquée. */
+      if (field.allowEmpty) {
+        return fieldHtml(id, label, `<div class="inline">
+          <input id="${id}_picker" type="color" value="${esc(value||'#000000')}"
+                 data-color-for="${esc(field.name)}">
+          <button type="button" class="btn link" data-clear-color="${esc(field.name)}"
+                  title="Revenir à la couleur par défaut">Par défaut</button>
+          ${field.hint ? `<span class="hint">${esc(field.hint)}</span>` : ''}
+          <input id="${id}" data-field="${esc(field.name)}" type="hidden" value="${esc(value||'')}">
+        </div>`);
+      }
       return fieldHtml(id, label, `<input id="${id}" data-field="${esc(field.name)}" type="color" value="${esc(value||'#000000')}">`);
     }
     if (field.type === 'select') {
@@ -1201,6 +1214,16 @@ function onToggleFlattenAll() {
         document.execCommand(cmd === 'clear' ? 'removeFormat' : cmd, false, null);
         return;
       }
+      const clearColorBtn = e.target.closest('[data-clear-color]');
+      if (clearColorBtn) {
+        e.preventDefault();
+        const wrap = clearColorBtn.closest('.field');
+        const hidden = wrap && wrap.querySelector('input[type=hidden][data-field="' + clearColorBtn.dataset.clearColor + '"]');
+        const picker = wrap && wrap.querySelector('input[type=color][data-color-for="' + clearColorBtn.dataset.clearColor + '"]');
+        if (hidden) hidden.value = '';
+        if (picker) picker.value = '#000000';
+        return;
+      }
       const clearBtn = e.target.closest('[data-clear]');
       if (clearBtn) {
         e.preventDefault();
@@ -1213,6 +1236,13 @@ function onToggleFlattenAll() {
       }
     });
     formEl.addEventListener('input', (e) => {
+      const titleColor = e.target.closest('input[type=color][data-color-for]');
+      if (titleColor) {
+        const wrap = titleColor.closest('.field');
+        const hidden = wrap && wrap.querySelector('input[type=hidden][data-field="' + titleColor.dataset.colorFor + '"]');
+        if (hidden) hidden.value = titleColor.value;
+        return;
+      }
       const colorInput = e.target.closest('.rte-color-input');
       if (colorInput) {
         const editor = colorInput.closest('.rte').querySelector('.rte-editor');

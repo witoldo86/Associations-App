@@ -141,28 +141,43 @@
       createEmpty: () => ({ title: '', html: '' }),
       validate: (v) => !!(v && typeof v.html === 'string' &&
                           v.html.replace(/<[^>]+>/g, '').trim().length),
-      summary:  (v) => (v && v.title) || (v && (v.html || '').replace(/<[^>]+>/g, '').slice(0, 60)),
+      summary:  (v) => (v && v.title && App.utils.stripHtml(String(v.title)).trim()) ||
+                       (v && (v.html || '').replace(/<[^>]+>/g, '').slice(0, 60)),
       formSchema: (v) => [
-        { name:'title', type:'text',     label:'Titre (facultatif)', value:(v&&v.title)||'' },
+        { name:'title',      type:'richtext', label:'Titre (facultatif — mêmes outils de mise en forme que le contenu)', value:(v&&v.title)||'' },
+        { name:'titleColor', type:'color',    label:'Couleur de l\'étiquette de titre', value:(v&&v.titleColor)||'', allowEmpty:true,
+          hint:'Laisser « Par défaut » pour la couleur standard' },
         { name:'html',  type:'richtext', label:'Contenu',            value:(v&&v.html)||'' }
       ],
-      build: (f) => ({ title: f.title || '', html: App.utils.sanitizeRich(f.html || '') }),
+      build: (f) => ({ title: App.utils.sanitizeRich(f.title || ''),
+                       html: App.utils.sanitizeRich(f.html || ''),
+                       titleColor: (f.titleColor || '') }),
+      /* Titre affiché : les anciens titres sont du texte brut (échappés),
+         les nouveaux du HTML sanitisé (média résolu). */
+      titleHtmlOf: (v) => {
+        if (!v || !v.title) return '';
+        const t = String(v.title);
+        return /<[a-z][\s\S]*>/i.test(t) ? App.utils.resolveMediaInHtml(t) : esc(t);
+      },
+      titleStyleOf: (v) => (v && v.titleColor) ? ' style="color:' + esc(v.titleColor) + '"' : '',
       render: (v, ctx) => {
+        const tc = App.schema.Types.richtext.titleStyleOf(v);
+        const th = App.schema.Types.richtext.titleHtmlOf(v);
         if (ctx && ctx.titleOnly) {
-          const t = (v && v.title && String(v.title).trim()) ||
+          const plain = (v && v.title && App.utils.stripHtml(String(v.title)).trim()) ||
             App.utils.stripHtml((v && v.html) || '').slice(0, 60) || 'Texte';
           return '<div class="item item-info item-title-only" data-item-key="' + esc(ctx.key) +
             '" data-item-type="richtext" title="Cliquez pour lire">' +
-            '<strong>' + esc(t) + '</strong><span class="item-title-hint">\u25b8 lire</span></div>';
+            '<strong' + tc + '>' + (th || esc(plain)) + '</strong><span class="item-title-hint">\u25b8 lire</span></div>';
         }
         return '<div class="item item-info" data-item-key="' + esc(ctx.key) +
           '" data-item-type="richtext">' +
-          (v && v.title ? '<strong>' + esc(v.title) + '</strong>' : '') +
+          (th ? '<strong class="item-title-rich"' + tc + '>' + th + '</strong>' : '') +
           '<div class="rich clamp">' + ((v && v.html) ? App.utils.resolveMediaInHtml(v.html) : '') + '</div>' +
           '</div>';
       },
       open: (v) => App.modal.open({
-        title: (v && v.title) || 'Cartel',
+        title: (v && v.title) ? (App.utils.stripHtml(String(v.title)) || 'Cartel') : 'Cartel',
         html: '<div class="modal-rich">' + ((v && v.html) ? App.utils.resolveMediaInHtml(v.html) : '') + '</div>'
       })
     }
@@ -207,13 +222,15 @@
     video: coerceMediaRich,
     url: coerceMediaRich,
     richtext(v) {
-      if (v == null) return { title: '', html: '' };
+      const colorOf = (c) => (typeof c === 'string' && /^#[0-9a-fA-F]{3,8}$/.test(c)) ? c : '';
+      if (v == null) return { title: '', html: '', titleColor: '' };
       // Chaîne ancienne : HTML brut conservé tel quel (sanitizeRich l'assainit ensuite)
-      if (typeof v === 'string') return { title: '', html: v };
+      if (typeof v === 'string') return { title: '', html: v, titleColor: '' };
       if (typeof v === 'object') {
-        return { title: String(v.title || ''), html: String(v.html != null ? v.html : (v.text || '')) };
+        return { title: String(v.title || ''), html: String(v.html != null ? v.html : (v.text || '')),
+                 titleColor: colorOf(v.titleColor) };
       }
-      return { title: '', html: '<p>' + esc(String(v)) + '</p>' };
+      return { title: '', html: '<p>' + esc(String(v)) + '</p>', titleColor: '' };
     }
   };
 
