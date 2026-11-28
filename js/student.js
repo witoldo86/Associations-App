@@ -464,8 +464,8 @@
       setTimeout(() => { if (s.parentNode) s.parentNode.removeChild(s); }, 3800);
     }
   }
-  function fxShow(x, y, power) {
-    const PK = FX_PACKS[fxPackName()];
+  function fxShow(x, y, power, packOverride) {
+    const PK = FX_PACKS[packOverride || fxPackName()] || FX_PACKS.fireworks;
     const p = Math.max(0.15, Math.min(1.6, power == null ? 1 : power));
     if (PK.shape === 'confetti') { fxRain(power); return; }
     const layer = fxLayer();
@@ -478,13 +478,14 @@
   }
   /* Écran de fin (option prof) : quand toutes les lignes sont complétées —
      score, étoiles (1 à 3 selon la réussite) et message personnalisé. */
-  function showEndScreen() {
+  function showEndScreen(msgOverride) {
     const c = cfg();
-    if (c.layout && c.layout.rewardsEnd === false) return;
+    if (c.layout && c.layout.rewardsEnd === false && msgOverride == null) return;
     const { total, max } = computeAnswers();
     const ratio = max > 0 ? total / max : 0;
     const stars = ratio >= 0.999 ? 3 : ratio >= 0.6 ? 2 : 1;
-    const msg = (c.layout && c.layout.rewardsMessage && String(c.layout.rewardsMessage).trim()) ||
+    const msg = (msgOverride != null && String(msgOverride).trim()) ||
+      (c.layout && c.layout.rewardsMessage && String(c.layout.rewardsMessage).trim()) ||
       'Bravo, tu as terminé l\'exercice !';
     let el = document.getElementById('fx-end');
     if (el) el.remove();
@@ -505,6 +506,17 @@
       if (el.parentNode) el.remove();
     });
   }
+  /* Aperçu depuis la fenêtre Grille (espace prof) : déclenche immédiatement
+     le pack choisi — sans attendre qu'une ligne soit complétée — et permet
+     de prévisualiser l'écran de fin. */
+  S.previewFx = function (packName) {
+    const x = window.innerWidth / 2;
+    const y = window.innerHeight / 2.6;
+    fxShow(x, y, 1.2, packName);
+    setTimeout(() => fxShow(Math.max(80, x - window.innerWidth * 0.2), y + 60, 0.9, packName), 320);
+    setTimeout(() => fxShow(x + window.innerWidth * 0.2, y + 60, 0.9, packName), 640);
+  };
+  S.previewEndScreen = function (msgOverride) { showEndScreen(msgOverride); };
   /* Mode de récompense choisi par le prof : 'off' | 'on' | 'progressive'.
      (Compatibilité : ancien layout.rewards true/false.) */
   function rewardsMode() {
@@ -518,17 +530,30 @@
   /* Points gagnés par la combinaison de la ligne : fraction de paires
      correctes (chaque élément au bon endroit rapporte, selon le barème
      du prof — paires, pondéré, ou tout-ou-rien). 0 = combinaison fausse. */
+  /* Correspondance d'agencement (modèle pédagogique : une ligne du plateau
+     est juste quand elle assemble les BONS éléments — peu importe SUR
+     laquelle des lignes du plateau, cf. condition d'apparition des infos).
+     Pour chaque ligne de référence : liste des modules dont l'élément posé
+     sur la ligne du plateau provient de cette référence. */
+  function arrangementScores(rowIndex) {
+    const mods = assocMods();
+    return App.state.rows().map((ref) => {
+      const matched = [];
+      mods.forEach((m) => {
+        const key = occupantOf(m.id, rowIndex);
+        if (key && board.items[key] && String(board.items[key].rowId) === String(ref.id))
+          matched.push(m.id);
+      });
+      return { rowId: ref.id, ok: matched.length, matched };
+    });
+  }
+
   function rowScoreRatio(rowIndex) {
     const mods = assocMods();
     if (!mods.length) return 0;
-    const r = App.state.rows()[rowIndex];
-    if (!r) return 0;
-    let ok = 0;
-    mods.forEach((m) => {
-      const key = occupantOf(m.id, rowIndex);
-      if (key && board.items[key] && String(board.items[key].rowId) === String(r.id)) ok++;
-    });
-    return ok / mods.length;
+    const scores = arrangementScores(rowIndex);
+    const best = scores.reduce((s, x) => Math.max(s, x.ok), 0);
+    return best / mods.length;
   }
 
   function celebrateRow(rowEl, rowIndex) {
@@ -653,13 +678,8 @@
           if (mode === 'off') return;
           let power = 1.5;                             // toutes les lignes : grande salve
           if (mode === 'progressive') {
-            const mods = assocMods();
-            let ok = 0;
-            rows.forEach((r, ri) => mods.forEach((m) => {
-              const key = occupantOf(m.id, ri);
-              if (key && board.items[key] && String(board.items[key].rowId) === String(r.id)) ok++;
-            }));
-            const ratio = mods.length ? ok / (rows.length * mods.length) : 0;
+            const { total, max } = computeAnswers();
+            const ratio = max > 0 ? total / max : 0;
             if (ratio <= 0) return;                    // tout faux : pas de célébration
             power = 0.6 + 0.9 * ratio;
           }
@@ -1276,6 +1296,11 @@ function refreshDropDisplay(moduleId, rowIndex, previousRow) {
     const weights = (c.scoring && c.scoring.weights) || {};
     const weightOf = (m) => Number(weights[m.id]) || 1;
 
+    const weightById = (id) => {
+      const m = mods.find((x) => x.id === id);
+      return m ? weightOf(m) : 1;
+    };
+
     let total = 0;
     let max = 0;
     const answers = App.state.rows().map((r, index) => {
@@ -1287,14 +1312,20 @@ function refreshDropDisplay(moduleId, rowIndex, previousRow) {
         cells[m.id] = item ? String(item.rowId) : null;
         pairs[m.id] = !!item && item.rowId === r.id;
       });
-      const correct = mods.every((m) => pairs[m.id]);
+      /* Agencement : la ligne est juste si elle reproduit l'assemblage d'une
+         ligne de référence — SUR N'IMPORTE LAQUELLE ligne du plateau. */
+      const scores = arrangementScores(index);
+      const bestOk = scores.reduce((s, x) => Math.max(s, x.ok), 0);
+      const bestWeighted = scores.reduce((s, x) =>
+        Math.max(s, x.matched.reduce((sum, id) => sum + weightById(id), 0)), 0);
+      const correct = mods.length > 0 && bestOk === mods.length;
 
       if (mode === 'pairs') {
         max += mods.length;
-        total += mods.filter((m) => pairs[m.id]).length;
+        total += bestOk;
       } else if (mode === 'weighted') {
         max += mods.reduce((s, m) => s + weightOf(m), 0);
-        total += mods.reduce((s, m) => s + (pairs[m.id] ? weightOf(m) : 0), 0);
+        total += bestWeighted;
       } else {                                   // 'all-or-nothing'
         max += 1;
         total += correct ? 1 : 0;

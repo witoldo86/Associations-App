@@ -176,17 +176,21 @@
             '</select></div>' +
           '<p class="hint" id="gd-rewards-hint" hidden>Choisissez d\'abord un mode de récompenses ci-dessus (sinon aucun effet ne s\'affiche).</p>' +
           '<div class="field gd-reward-extra"><label for="gd-rewards-fx">Type d\'effets (pack)</label>' +
+            '<div class="inline" style="gap:.5rem; align-items:center">' +
             '<select id="gd-rewards-fx">' +
               '<option value="fireworks"' + (!l.rewardsFx || l.rewardsFx === 'fireworks' ? ' selected' : '') + '>Feux d\'artifice (par défaut)</option>' +
               '<option value="confetti"' + (l.rewardsFx === 'confetti' ? ' selected' : '') + '>Confettis — pluie colorée</option>' +
               '<option value="stars"' + (l.rewardsFx === 'stars' ? ' selected' : '') + '>Étoiles</option>' +
               '<option value="nature"' + (l.rewardsFx === 'nature' ? ' selected' : '') + '>Nature — fleurs et papillons</option>' +
               '<option value="museum"' + (l.rewardsFx === 'museum' ? ' selected' : '') + '>Musée — poussière dorée</option>' +
-            '</select></div>' +
+            '</select>' +
+            '<button type="button" class="btn small" id="gd-rewards-try" title="Déclenche tout de suite ce pack pour le voir">Tester</button>' +
+            '</div></div>' +
           '<label class="inline gd-reward-extra" style="gap:.45rem">' +
             '<input id="gd-rewards-end" type="checkbox"' + (l.rewardsEnd === false ? '' : ' checked') + '>' +
             'Écran de fin : score, étoiles (1 à 3) et message quand tout est terminé' +
           '</label>' +
+          '<button type="button" class="btn small gd-reward-extra" id="gd-rewards-end-try" style="margin:.2rem 0 0">👁 Aperçu de l\'écran de fin</button>' +
           '<div class="field gd-reward-extra"><label for="gd-rewards-msg">Message de félicitations (écran de fin)</label>' +
             '<input id="gd-rewards-msg" type="text" value="' + esc(l.rewardsMessage || '') + '" placeholder="Bravo, tu as tout trouvé !"></div>' +
           '<p class="hint">Le <strong>plateau</strong> est la zone où l’élève dépose ses réponses ; ' +
@@ -214,6 +218,21 @@
     };
     if (rewardsSel) rewardsSel.addEventListener('change', syncRewardsUI);
     syncRewardsUI();
+
+    /* Boutons « Tester » : effets du pack choisi + aperçu de l'écran de fin,
+       sans avoir à compléter une ligne — retour immédiat pour le prof. */
+    const tryBtn = document.getElementById('gd-rewards-try');
+    if (tryBtn) tryBtn.addEventListener('click', () => {
+      const sel = document.getElementById('gd-rewards-fx');
+      if (App.student && App.student.previewFx && sel)
+        App.student.previewFx(sel.value);
+    });
+    const endTryBtn = document.getElementById('gd-rewards-end-try');
+    if (endTryBtn) endTryBtn.addEventListener('click', () => {
+      const msgEl = document.getElementById('gd-rewards-msg');
+      if (App.student && App.student.previewEndScreen)
+        App.student.previewEndScreen(msgEl ? msgEl.value : null);
+    });
 
     document.getElementById('gd-save').addEventListener('click', () => {
       const c2 = cloneData(cfg());
