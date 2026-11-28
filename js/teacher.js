@@ -174,7 +174,8 @@
               '<option value="on"' + (l.rewards === 'on' || l.rewards === true ? ' selected' : '') + '>À chaque ligne complétée (même intensité)</option>' +
               '<option value="progressive"' + (l.rewards === 'progressive' ? ' selected' : '') + '>Intensité selon la réussite de la combinaison</option>' +
             '</select></div>' +
-          '<div class="field"><label for="gd-rewards-fx">Type d\'effets (pack)</label>' +
+          '<p class="hint" id="gd-rewards-hint" hidden>Choisissez d\'abord un mode de récompenses ci-dessus (sinon aucun effet ne s\'affiche).</p>' +
+          '<div class="field gd-reward-extra"><label for="gd-rewards-fx">Type d\'effets (pack)</label>' +
             '<select id="gd-rewards-fx">' +
               '<option value="fireworks"' + (!l.rewardsFx || l.rewardsFx === 'fireworks' ? ' selected' : '') + '>Feux d\'artifice (par défaut)</option>' +
               '<option value="confetti"' + (l.rewardsFx === 'confetti' ? ' selected' : '') + '>Confettis — pluie colorée</option>' +
@@ -182,11 +183,11 @@
               '<option value="nature"' + (l.rewardsFx === 'nature' ? ' selected' : '') + '>Nature — fleurs et papillons</option>' +
               '<option value="museum"' + (l.rewardsFx === 'museum' ? ' selected' : '') + '>Musée — poussière dorée</option>' +
             '</select></div>' +
-          '<label class="inline" style="gap:.45rem">' +
+          '<label class="inline gd-reward-extra" style="gap:.45rem">' +
             '<input id="gd-rewards-end" type="checkbox"' + (l.rewardsEnd === false ? '' : ' checked') + '>' +
             'Écran de fin : score, étoiles (1 à 3) et message quand tout est terminé' +
           '</label>' +
-          '<div class="field"><label for="gd-rewards-msg">Message de félicitations (écran de fin)</label>' +
+          '<div class="field gd-reward-extra"><label for="gd-rewards-msg">Message de félicitations (écran de fin)</label>' +
             '<input id="gd-rewards-msg" type="text" value="' + esc(l.rewardsMessage || '') + '" placeholder="Bravo, tu as tout trouvé !"></div>' +
           '<p class="hint">Le <strong>plateau</strong> est la zone où l’élève dépose ses réponses ; ' +
             'les <strong>réserves</strong> sont les bacs d’où il pioche les éléments. ' +
@@ -197,6 +198,23 @@
           '</div>' +
         '</form>'
     });
+    /* Les options (pack, écran de fin, message) n'ont de sens que si un
+       mode de récompenses est actif : on les grise sinon, avec un rappel. */
+    const rewardsSel = document.getElementById('gd-rewards');
+    const syncRewardsUI = () => {
+      const off = !rewardsSel || rewardsSel.value === 'off';
+      ['gd-rewards-fx', 'gd-rewards-end', 'gd-rewards-msg'].forEach((id) => {
+        const el = document.getElementById(id);
+        if (el) el.disabled = off;
+      });
+      document.querySelectorAll('.gd-reward-extra').forEach((el) =>
+        el.classList.toggle('is-disabled', off));
+      const hint = document.getElementById('gd-rewards-hint');
+      if (hint) hint.hidden = !off;
+    };
+    if (rewardsSel) rewardsSel.addEventListener('change', syncRewardsUI);
+    syncRewardsUI();
+
     document.getElementById('gd-save').addEventListener('click', () => {
       const c2 = cloneData(cfg());
       c2.layout = Object.assign({}, c2.layout, {

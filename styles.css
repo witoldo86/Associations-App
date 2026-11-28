@@ -1658,9 +1658,19 @@ body.student-mode #s-pools-zone .pool-col.is-expanded .item-image img{
   70%{ opacity:1; }
   to{ transform:translate(var(--fx-x,40px), var(--fx-y,60px)) scale(.2); opacity:0; }
 }
+/* Mouvement réduit (réglage OS/navigateur) : on ne masque plus la couche
+   d'effets (sinon les récompenses disparaissent totalement pour ces
+   utilisateurs) — les particules restent visibles, mais immobiles, et
+   s'effacent doucement. */
 @media(prefers-reduced-motion:reduce){
-  #fx-layer{ display:none; }
+  .fx-spark,.fx-char,.fx-confetti{ animation:fx-still 1.2s ease-out forwards; }
 }
+@keyframes fx-still{
+  from{ opacity:.95; }
+  to{ opacity:0; }
+}
+/* Options de récompenses grisées quand « Aucune » est choisi. */
+.gd-reward-extra.is-disabled{ opacity:.45; pointer-events:none; }
 /* Particules « caractère » : étoiles (pack Étoiles) ou émojis (pack Nature) */
 .fx-char{
   position:absolute; font-size:1.1rem; line-height:1;
