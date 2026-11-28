@@ -168,12 +168,26 @@
               '<option value="2"' + (l.infoCols === 2 ? ' selected' : '') + '>2 par ligne</option>' +
               '<option value="3"' + (l.infoCols === 3 ? ' selected' : '') + '>3 par ligne</option>' +
             '</select></div>' +
-          '<div class="field"><label for="gd-rewards">Récompenses visuelles (feux d’artifice)</label>' +
+          '<div class="field"><label for="gd-rewards">Récompenses visuelles</label>' +
             '<select id="gd-rewards">' +
               '<option value="off"' + (!l.rewards || l.rewards === 'off' || l.rewards === false ? ' selected' : '') + '>Aucune</option>' +
               '<option value="on"' + (l.rewards === 'on' || l.rewards === true ? ' selected' : '') + '>À chaque ligne complétée (même intensité)</option>' +
               '<option value="progressive"' + (l.rewards === 'progressive' ? ' selected' : '') + '>Intensité selon la réussite de la combinaison</option>' +
             '</select></div>' +
+          '<div class="field"><label for="gd-rewards-fx">Type d\'effets (pack)</label>' +
+            '<select id="gd-rewards-fx">' +
+              '<option value="fireworks"' + (!l.rewardsFx || l.rewardsFx === 'fireworks' ? ' selected' : '') + '>Feux d\'artifice (par défaut)</option>' +
+              '<option value="confetti"' + (l.rewardsFx === 'confetti' ? ' selected' : '') + '>Confettis — pluie colorée</option>' +
+              '<option value="stars"' + (l.rewardsFx === 'stars' ? ' selected' : '') + '>Étoiles</option>' +
+              '<option value="nature"' + (l.rewardsFx === 'nature' ? ' selected' : '') + '>Nature — fleurs et papillons</option>' +
+              '<option value="museum"' + (l.rewardsFx === 'museum' ? ' selected' : '') + '>Musée — poussière dorée</option>' +
+            '</select></div>' +
+          '<label class="inline" style="gap:.45rem">' +
+            '<input id="gd-rewards-end" type="checkbox"' + (l.rewardsEnd === false ? '' : ' checked') + '>' +
+            'Écran de fin : score, étoiles (1 à 3) et message quand tout est terminé' +
+          '</label>' +
+          '<div class="field"><label for="gd-rewards-msg">Message de félicitations (écran de fin)</label>' +
+            '<input id="gd-rewards-msg" type="text" value="' + esc(l.rewardsMessage || '') + '" placeholder="Bravo, tu as tout trouvé !"></div>' +
           '<p class="hint">Le <strong>plateau</strong> est la zone où l’élève dépose ses réponses ; ' +
             'les <strong>réserves</strong> sont les bacs d’où il pioche les éléments. ' +
             'Dans chaque ligne, les largeurs réglées avec les poignées sont conservées.</p>' +
@@ -198,6 +212,16 @@
           const el = document.getElementById('gd-rewards');
           const v = el ? el.value : 'off';
           return (v === 'on' || v === 'progressive') ? v : 'off';
+        })(),
+        rewardsFx: (function () {
+          const v = document.getElementById('gd-rewards-fx') ?
+            document.getElementById('gd-rewards-fx').value : 'fireworks';
+          return ['fireworks','confetti','stars','nature','museum'].indexOf(v) !== -1 ? v : 'fireworks';
+        })(),
+        rewardsEnd: !(document.getElementById('gd-rewards-end') && !document.getElementById('gd-rewards-end').checked),
+        rewardsMessage: (function () {
+          const el = document.getElementById('gd-rewards-msg');
+          return el ? el.value.trim() : '';
         })()
       });
       App.state.updateConfig(c2);

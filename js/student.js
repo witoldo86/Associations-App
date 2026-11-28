@@ -399,6 +399,20 @@
      interaction (pointer-events:none), particules auto-nettoyées.
      ========================================================= */
   const FX_COLORS = ['#f59e0b','#ef4444','#22c55e','#3b82f6','#a855f7','#ec4899','#facc15','#14b8a6'];
+
+  /* Packs d'effets (choix du prof) : chaque famille a ses couleurs et la
+     forme de ses particules — étincelles, confettis, étoiles, émojis. */
+  const FX_PACKS = {
+    fireworks: { colors: FX_COLORS, shape: 'spark' },
+    museum:    { colors: ['#d4af37','#f5e6a8','#b8860b','#fff8dc','#e6c860'], shape: 'spark' },
+    confetti:  { colors: ['#ef4444','#f59e0b','#22c55e','#3b82f6','#a855f7','#ec4899','#facc15','#14b8a6'], shape: 'confetti' },
+    stars:     { colors: ['#facc15','#fbbf24','#f59e0b','#fde047','#93c5fd'], shape: 'char', chars: ['★','✦','✧'] },
+    nature:    { colors: ['#22c55e','#86efac','#f472b6','#a3e635','#fb7185'], shape: 'char', chars: ['🌸','🦋','🍃','🌼'] }
+  };
+  function fxPackName() {
+    const v = cfg().layout && cfg().layout.rewardsFx;
+    return (v && FX_PACKS[v]) ? v : 'fireworks';
+  }
   function fxLayer() {
     let el = document.getElementById('fx-layer');
     if (!el) {
@@ -408,25 +422,88 @@
     }
     return el;
   }
-  function fxShow(x, y, power) {
+  /* Une particule d'éclatement : étincelle ronde (feux d'artifice, musée),
+     caractère (étoile, émoji) — même trajectoire, habillage différent. */
+  function fxParticle(x, y, p, i, PK) {
+    const s = document.createElement('span');
+    const ang = Math.random() * Math.PI * 2;
+    const dist = 40 + 55 * p + Math.random() * (30 + 60 * p);
+    const c = PK.colors[i % PK.colors.length];
+    if (PK.shape === 'char') {
+      s.className = 'fx-char';
+      s.textContent = PK.chars[i % PK.chars.length];
+      s.style.color = c;
+    } else {
+      s.className = 'fx-spark';
+      s.style.setProperty('--fx-c', c);
+    }
+    s.style.left = Math.round(x) + 'px';
+    s.style.top = Math.round(y) + 'px';
+    s.style.setProperty('--fx-x', Math.round(Math.cos(ang) * dist) + 'px');
+    s.style.setProperty('--fx-y', Math.round(Math.sin(ang) * dist) + 'px');
+    s.style.setProperty('--fx-d', (0.7 + Math.random() * 0.6).toFixed(2) + 's');
+    s.style.setProperty('--fx-s', (0.6 + Math.random() * 0.9).toFixed(2));
+    return s;
+  }
+  /* Confettis : pluie du haut de l'écran (petits rectangles qui tournoient). */
+  function fxRain(power) {
     const layer = fxLayer();
     const p = Math.max(0.15, Math.min(1.6, power == null ? 1 : power));
-    const n = Math.round(10 + 38 * p);
+    const PK = FX_PACKS.confetti;
+    const n = Math.round(30 + 60 * p);
     for (let i = 0; i < n; i++) {
       const s = document.createElement('span');
-      s.className = 'fx-spark';
-      const ang = Math.random() * Math.PI * 2;
-      const dist = 40 + 55 * p + Math.random() * (30 + 60 * p);
-      s.style.left = Math.round(x) + 'px';
-      s.style.top = Math.round(y) + 'px';
-      s.style.setProperty('--fx-x', Math.round(Math.cos(ang) * dist) + 'px');
-      s.style.setProperty('--fx-y', Math.round(Math.sin(ang) * dist) + 'px');
-      s.style.setProperty('--fx-c', FX_COLORS[i % FX_COLORS.length]);
-      s.style.setProperty('--fx-d', (0.7 + Math.random() * 0.6).toFixed(2) + 's');
-      s.style.setProperty('--fx-s', (0.6 + Math.random() * 0.9).toFixed(2));
+      s.className = 'fx-confetti';
+      s.style.left = Math.round(Math.random() * 100) + 'vw';
+      s.style.background = PK.colors[i % PK.colors.length];
+      s.style.setProperty('--fx-r', Math.round(Math.random() * 720 - 360) + 'deg');
+      s.style.setProperty('--fx-x', Math.round(Math.random() * 120 - 60) + 'px');
+      s.style.setProperty('--fx-d', (1.4 + Math.random() * 1.6).toFixed(2) + 's');
+      s.style.animationDelay = (Math.random() * 0.5).toFixed(2) + 's';
+      layer.appendChild(s);
+      setTimeout(() => { if (s.parentNode) s.parentNode.removeChild(s); }, 3800);
+    }
+  }
+  function fxShow(x, y, power) {
+    const PK = FX_PACKS[fxPackName()];
+    const p = Math.max(0.15, Math.min(1.6, power == null ? 1 : power));
+    if (PK.shape === 'confetti') { fxRain(power); return; }
+    const layer = fxLayer();
+    const n = Math.round(10 + 38 * p);
+    for (let i = 0; i < n; i++) {
+      const s = fxParticle(x, y, p, i, PK);
       layer.appendChild(s);
       setTimeout(() => { if (s.parentNode) s.parentNode.removeChild(s); }, 1600);
     }
+  }
+  /* Écran de fin (option prof) : quand toutes les lignes sont complétées —
+     score, étoiles (1 à 3 selon la réussite) et message personnalisé. */
+  function showEndScreen() {
+    const c = cfg();
+    if (c.layout && c.layout.rewardsEnd === false) return;
+    const { total, max } = computeAnswers();
+    const ratio = max > 0 ? total / max : 0;
+    const stars = ratio >= 0.999 ? 3 : ratio >= 0.6 ? 2 : 1;
+    const msg = (c.layout && c.layout.rewardsMessage && String(c.layout.rewardsMessage).trim()) ||
+      'Bravo, tu as terminé l\'exercice !';
+    let el = document.getElementById('fx-end');
+    if (el) el.remove();
+    el = document.createElement('div');
+    el.id = 'fx-end';
+    el.innerHTML = '<div class="fx-end-card">' +
+      '<div class="fx-end-stars" aria-label="' + stars + ' étoiles sur 3">' +
+      '★★★'.split('').map((ch, i) =>
+        '<span class="' + (i < stars ? 'lit' : 'dim') + '">' + ch + '</span>').join('') +
+      '</div>' +
+      '<h3>Exercice terminé</h3>' +
+      '<p class="fx-end-score">Score : ' + total + ' / ' + max + '</p>' +
+      '<p class="fx-end-msg">' + esc(msg) + '</p>' +
+      '<button type="button" class="btn primary" id="fx-end-close">Continuer</button>' +
+      '</div>';
+    document.body.appendChild(el);
+    document.getElementById('fx-end-close').addEventListener('click', () => {
+      if (el.parentNode) el.remove();
+    });
   }
   /* Mode de récompense choisi par le prof : 'off' | 'on' | 'progressive'.
      (Compatibilité : ancien layout.rewards true/false.) */
@@ -466,6 +543,12 @@
     const r = rowEl && rowEl.getBoundingClientRect ? rowEl.getBoundingClientRect() : null;
     const x = (r && r.width) ? r.left + r.width / 2 : window.innerWidth / 2;
     const y = (r && r.height) ? r.top + r.height / 2 : window.innerHeight / 3;
+    /* Aura lumineuse : la ligne complétée pulse brièvement (tous les packs). */
+    if (rowEl && rowEl.classList) {
+      rowEl.classList.remove('row-glow');
+      rowEl.classList.add('row-glow');
+      setTimeout(() => rowEl.classList.remove('row-glow'), 1500);
+    }
     fxShow(x, y, power);
   }
 
@@ -581,6 +664,7 @@
             power = 0.6 + 0.9 * ratio;
           }
           fxShow(window.innerWidth / 2, window.innerHeight / 2, power);
+          showEndScreen();
         }, 550);
       }
     }
