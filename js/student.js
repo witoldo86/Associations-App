@@ -14,6 +14,11 @@
   let viewed = {};        // { [moduleId]: Set(keys) }
   let moduleState = {};   // { [moduleId]: { locked, deps, pw } }
   let pwOk = {};          // { [moduleId]: true } — mot de passe déjà saisi (session)
+  /* Réponses de l'élève aux questions des fenêtres de visualisation :
+     { [moduleId]: { [indexQuestion]: réponse } } — session en cours.
+     Révisables : la modale se rouvre pré-remplie (l'élève ne voit pas
+     immédiatement le résultat, il apparaîtra dans le fichier de score). */
+  let questionAnswers = {};
   // Bacs dont la taille des vignettes est déjà figée (voir freezePoolColumns)
   const frozenPools = {};
   /* Lignes complètes au rendu précédent : pour ne fêter que les lignes qui
@@ -223,6 +228,7 @@
 
     viewed = {};
     pwOk = {};
+    questionAnswers = {};   // nouvelles données du prof : réponses reparties à zéro
     Object.keys(frozenPools).forEach((k) => { delete frozenPools[k]; });
     mods.forEach((m) => { viewed[m.id] = new Set(); });
     buildBoard();
@@ -820,6 +826,8 @@
       ? App.schema.Types.richtext.modalTitleHtml(v) : '';
     App.modal.open({ title: infoTitle, titleHtml, html: body || '<p>—</p>', wide: m.kind === 'url',
       titleColor: (m.kind === 'richtext' && v && v.titleColor) || '' });
+    /* Un panneau d'information peut lui aussi porter des questions. */
+    injectQuestionsBadge(m.id);
   }
 
   /* =========================================================
@@ -1220,6 +1228,7 @@ function refreshDropDisplay(moduleId, rowIndex, previousRow) {
     const run = () => {
       if (type && type.open) type.open(item.value);
       injectModalNav(item.moduleId, key);
+      injectQuestionsBadge(item.moduleId);
       // Le rendu n'est refait que si cette ouverture peut changer un verrou
       if (isNew && assocMods().some((m) => m.unlockAfter && m.unlockAfter.includes(item.moduleId))) {
         render();
@@ -1278,12 +1287,126 @@ function refreshDropDisplay(moduleId, rowIndex, previousRow) {
         const isNew = !!set && !set.has(k);
         if (set) markViewedTwin(moduleId, k);
         App.schema.Types[item.kind].open(item.value);
-        setTimeout(() => injectModalNav(moduleId, k), 0);
+        setTimeout(() => { injectModalNav(moduleId, k); injectQuestionsBadge(moduleId); }, 0);
         if (isNew && assocMods().some((m) => m.unlockAfter && m.unlockAfter.includes(moduleId))) {
           render();
         }
       });
     });
+  }
+
+  /* =========================================================
+     QUESTIONS DANS LES FENÊTRES DE VISUALISATION
+     Bouton « Question(s) » dans l'en-tête de la fenêtre (il pulse tant
+     qu'aucune réponse n'a été donnée) ; la modale se rouvre pré-remplie.
+     ========================================================= */
+  /* Ce module porte-t-il des questions, et l'élève a-t-il répondu ? */
+  function questionsOf(moduleId) {
+    const m = cfg().modules.find((x) => String(x.id) === String(moduleId));
+    return m ? App.utils.qNormalize(m) : [];
+  }
+  function qAnswered(moduleId) {
+    const s = questionAnswers[moduleId];
+    return !!s && Object.keys(s).length > 0;
+  }
+
+  /* Bouton « Question(s) » dans l'en-tête de la fenêtre de visualisation
+     (image, cartel, son, vidéo, page web, panneau d'information…). */
+  function injectQuestionsBadge(moduleId) {
+    const qs = questionsOf(moduleId);
+    if (!qs.length) return;
+    const box = document.querySelector('#modal-root .modal-image, #modal-root .modal');
+    const head = box && box.querySelector('.modal-head');
+    if (!head || head.querySelector('[data-questions-badge]')) return;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'q-badge ' + (qAnswered(moduleId) ? 'is-answered' : 'is-pending');
+    btn.setAttribute('data-questions-badge', String(moduleId));
+    btn.textContent = qAnswered(moduleId) ? '❓ Répondu' : '❓ Question(s)';
+    btn.title = qAnswered(moduleId) ? 'Revoir / modifier tes réponses' : 'Il y a des questions ici !';
+    btn.addEventListener('click', () => openQuestionsModal(moduleId));
+    head.insertBefore(btn, head.querySelector('.modal-close'));
+  }
+
+  /* Modale des questions : énoncés mis en forme, choix multiples cochables,
+     réponses libres ; enregistrement immédiat (le résultat ne s'affiche pas
+     tout de suite — il paraîtra dans le fichier de score du prof). */
+  function openQuestionsModal(moduleId) {
+    const m = cfg().modules.find((x) => String(x.id) === String(moduleId));
+    if (!m) return;
+    const qs = App.utils.qNormalize(m);
+    if (!qs.length) return;
+    const saved = questionAnswers[m.id] || {};
+    const body = '<form id="q-form" novalidate>' +
+      qs.map((q, i) => `
+        <fieldset class="module-fieldset">
+          <legend>Question ${i + 1} — ${esc(String(q.points))} point${q.points > 1 ? 's' : ''}${q.type === 'choice' ? ' — plusieurs réponses possibles' : ''}</legend>
+          <div class="modal-rich">${App.utils.resolveMediaInHtml(q.html)}</div>
+          ${q.type === 'choice'
+            ? q.options.filter((o) => App.utils.qNormText(o.text)).map((o, j) =>
+                '<label class="inline q-opt" style="gap:.45rem; margin:.2rem 0">' +
+                '<input type="checkbox" data-q-pick="' + i + ':' + j + '" data-q-i="' + i + '"> ' +
+                esc(o.text) + '</label>').join('')
+            : '<input type="text" class="q-free" data-q-free="' + i + '" data-q-i="' + i + '" placeholder="Ta réponse…" style="width:100%">'}
+        </fieldset>`).join('') +
+      '<div class="form-actions"><button type="button" class="btn primary" id="q-save">Enregistrer mes réponses</button></div>' +
+      '<p class="hint" id="q-note">Tes réponses comptent pour le score final — tu pourras les modifier.' +
+      (qAnswered(m.id) ? ' (réponses précédentes rechargées)' : '') + '</p></form>';
+    App.modal.open({ title: 'Questions — ' + modLabel(m), html: body });
+    /* Pré-remplissage avec les réponses précédentes (l'élève peut revenir). */
+    const form = document.getElementById('q-form');
+    qs.forEach((q, i) => {
+      const prev = saved[i];
+      if (prev == null) return;
+      if (q.type === 'choice') {
+        (Array.isArray(prev) ? prev : []).forEach((t) => {
+          const norm = App.utils.qNormText(t);
+          form.querySelectorAll('[data-q-pick][data-q-i="' + i + '"]').forEach((cb) => {
+            const j = Number(cb.dataset.qPick.split(':')[1]);
+            if (q.options[j] && App.utils.qNormText(q.options[j].text) === norm) cb.checked = true;
+          });
+        });
+      } else {
+        const inp = form.querySelector('[data-q-free][data-q-i="' + i + '"]');
+        if (inp && !Array.isArray(prev)) inp.value = String(prev);
+      }
+    });
+    document.getElementById('q-save').addEventListener('click', () => saveQuestions(m));
+  }
+
+  /* Lecture du formulaire → réponses mémorisées + éventuelle récompense
+     visuelle (c'est le prof qui décide : jamais / à chaque réponse /
+     seulement si toutes les réponses du module sont bonnes). */
+  function saveQuestions(m) {
+    const qs = App.utils.qNormalize(m);
+    const form = document.getElementById('q-form');
+    if (!form || !qs.length) return;
+    const saved = {};
+    let any = false;
+    let allCorrect = true;
+    qs.forEach((q, i) => {
+      let resp;
+      if (q.type === 'choice') {
+        resp = [...form.querySelectorAll('[data-q-pick][data-q-i="' + i + '"]:checked')]
+          .map((cb) => (q.options[Number(cb.dataset.qPick.split(':')[1])] || {}).text || '')
+          .filter((t) => App.utils.qNormText(t));
+      } else {
+        const inp = form.querySelector('[data-q-free][data-q-i="' + i + '"]');
+        resp = inp ? inp.value : '';
+      }
+      const has = Array.isArray(resp) ? resp.length > 0 : String(resp).trim().length > 0;
+      if (has) { saved[i] = resp; any = true; }
+      if (!has || !App.utils.qCheck(q, resp).correct) allCorrect = false;
+    });
+    questionAnswers[m.id] = saved;
+    const mode = m.qRewards || 'correct';
+    if (fxEnabled() && (mode === 'answer' || (mode === 'correct' && any && allCorrect))) {
+      fxShow(window.innerWidth / 2, window.innerHeight / 2, 1.1);
+    }
+    /* La modale reste ouverte : l'élève peut encore changer d'avis.
+       Le badge « Répondu » apparaîtra à la prochaine ouverture. */
+    const note = document.getElementById('q-note');
+    if (note) note.textContent = '✓ Réponses enregistrées — tu peux les modifier.';
   }
 
   /* =========================================================
@@ -1332,12 +1455,41 @@ function refreshDropDisplay(moduleId, rowIndex, previousRow) {
       }
       return { row: r, cells, pairs, correct };
     });
-    return { answers, total, max };
+    /* Les questions comptent dans le score global (barème du prof). */
+    const qs = questionScore();
+    return { answers, total: total + qs.total, max: max + qs.max, questionItems: qs.items };
+  }
+
+  /* Points obtenus aux questions, module par module (pour le fichier de
+     score du prof : chaque question, réponse donnée ou non, points/barème). */
+  function questionScore() {
+    const mods = cfg().modules.filter((m) => App.utils.qNormalize(m).length);
+    const items = [];
+    let total = 0;
+    let max = 0;
+    mods.forEach((m) => {
+      const qs = App.utils.qNormalize(m);
+      const saved = questionAnswers[m.id] || {};
+      const results = qs.map((q, i) => {
+        const resp = saved[i];
+        const hasResp = Array.isArray(resp) ? resp.length > 0
+          : (resp != null && String(resp).length > 0);
+        const chk = hasResp ? App.utils.qCheck(q, resp) : { correct: false, points: 0 };
+        return { i, answered: hasResp, correct: !!chk.correct,
+                 points: chk.points, maxPoints: App.utils.qMaxPoints(q) };
+      });
+      const pts = results.reduce((s, r) => s + r.points, 0);
+      const mx = results.reduce((s, r) => s + r.maxPoints, 0);
+      total += pts;
+      max += mx;
+      items.push({ moduleId: m.id, label: modLabel(m), results, points: pts, maxPoints: mx });
+    });
+    return { items, total, max };
   }
 
   function onSave() {
     if ($('#s-save').disabled) return;
-    const { answers, total, max } = computeAnswers();
+    const { answers, total, max, questionItems } = computeAnswers();
 
     const input = prompt('Ton nom (nom + prénom) :', '');
     if (input === null) return;
@@ -1349,7 +1501,10 @@ function refreshDropDisplay(moduleId, rowIndex, previousRow) {
       savedAt: new Date().toISOString(),
       student: { name },
       score: { total, max },
-      answers
+      answers,
+      /* Détail des questions : points par question, réponse donnée ou non
+         (réponse en clair pour les champs libres, textes cochés sinon). */
+      questionAnswers: questionItems
     };
 
     const safeName = name.replace(/[^a-z0-9_\-]/gi, '_').toLowerCase() || 'anonyme';

@@ -172,4 +172,54 @@
     set(k, v) { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } },
     remove(k) { try { localStorage.removeItem(k); } catch (e) {} }
   };
+
+  /* =========================================================
+     QUESTIONS DANS LES FENÊTRES DE VISUALISATION
+     Helpers partagés prof / élève : normalisation des questions
+     définies par le prof, comparaison souple des réponses, points.
+     ========================================================= */
+  /* Liste normalisée des questions d'un module ([] si aucune). */
+  utils.qNormalize = function (m) {
+    const arr = (m && Array.isArray(m.questions)) ? m.questions : [];
+    return arr.map((q) => ({
+      html: String((q && q.html) || ''),
+      type: (q && q.type === 'choice') ? 'choice' : 'simple',
+      expected: (q && q.expected != null) ? String(q.expected) : '',
+      options: ((q && Array.isArray(q.options)) ? q.options : []).map((o) => ({
+        text: (o && o.text != null) ? String(o.text) : '',
+        correct: !!(o && o.correct)
+      })),
+      points: Math.max(0, Number(q && q.points) || 1)
+    })).filter((q) => utils.stripHtml(q.html).trim().length);
+  };
+  /* Comparaison souple : minuscules, sans accents ni apostrophes typographiques,
+     espaces réduits — « École » et "ecole " sont identiques. */
+  utils.qNormText = function (s) {
+    return String(s == null ? '' : s)
+      .toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/[\u2019\u2018]/g, "'")
+      .replace(/\s+/g, ' ').trim();
+  };
+  /* Correction d'une réponse : { correct, points }. Choix multiple : c'est le
+     prof qui a coché les bonnes propositions — l'élève doit les retrouver
+     TOUTES (et seulement elles). Réponse simple : comparaison souple avec la
+     réponse attendue (vide = toute réponse compte, question ouverte). */
+  utils.qCheck = function (q, resp) {
+    const pts = Math.max(0, Number(q && q.points) || 1);
+    if (!q) return { correct: false, points: 0 };
+    if (q.type === 'choice') {
+      const rights = (q.options || []).filter((o) => o.correct).map((o) => utils.qNormText(o.text));
+      const picks = (Array.isArray(resp) ? resp : []).map((t) => utils.qNormText(t));
+      const ok = rights.length > 0 && picks.length === rights.length &&
+        rights.every((r) => picks.indexOf(r) !== -1);
+      return { correct: ok, points: ok ? pts : 0 };
+    }
+    const exp = utils.qNormText(q.expected);
+    const got = utils.qNormText(Array.isArray(resp) ? (resp[0] || '') : resp);
+    const ok = got.length > 0 && (!exp || got === exp);
+    return { correct: ok, points: ok ? pts : 0 };
+  };
+  /* Points maximum d'une question (barème choisi par le prof). */
+  utils.qMaxPoints = function (q) { return Math.max(0, Number(q && q.points) || 1); };
 })();

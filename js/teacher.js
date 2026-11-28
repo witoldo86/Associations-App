@@ -483,6 +483,7 @@
       <button type="button" class="modal-tab is-active" data-tab="module">Module</button>
       <button type="button" class="modal-tab" data-tab="present">Présentation</button>
       <button type="button" class="modal-tab" data-tab="contents">Contenu du pool</button>
+      <button type="button" class="modal-tab" data-tab="questions">Questions</button>
     </div>
     <form id="module-form" novalidate>
       <input id="mf-zone" type="hidden" value="${zoneOk ? esc(zone) : ''}">
@@ -569,6 +570,9 @@
       <div class="modal-tabpane" data-pane="contents" hidden>
         ${overviewHtml}
       </div>
+      <div class="modal-tabpane" data-pane="questions" hidden>
+        ${questionsBlockHtml(m, isNew)}
+      </div>
       <div class="form-actions">
         <button type="submit" class="btn primary" id="mf-save">${isNew ? 'Ajouter' : 'Enregistrer'}</button>
         <button type="button" class="btn" id="mf-cancel">Annuler</button>
@@ -584,6 +588,182 @@
     return type.summary(v) || '(contenu)';
   }
 
+  /* =========================================================
+     ONGLET « QUESTIONS » — questions posées dans la fenêtre de
+     visualisation du module (réponse simple ou choix multiple,
+     points attribués par le prof à chaque question).
+     ========================================================= */
+  /* Bloc de l'onglet : interrupteur + éditeur inline + récompense visuelle. */
+  function questionsBlockHtml(m, isNew) {
+    const qs = (m && Array.isArray(m.questions)) ? m.questions : [];
+    const on = !!(m && qs.length);
+    const editor = isNew
+      ? '<p class="hint">Enregistrez d\'abord le module (bouton « Ajouter ») pour pouvoir rédiger ses questions.</p>'
+      : questionsEditorHtml(qs);
+    const rw = (m && m.qRewards) || 'correct';
+    return `
+      <label class="inline" style="gap:.45rem">
+        <input id="mf-questions-on" type="checkbox" ${on ? 'checked' : ''}>
+        Ajouter des questions à la fenêtre de visualisation de ce module
+        (chez l'élève, un bouton « Question(s) » y pulsera tant qu'il n'a pas répondu)
+      </label>
+      <div id="mf-q-body" ${on ? '' : 'hidden'}>
+        ${editor}
+      </div>
+      <div class="field" id="mf-q-rewards-row">
+        <label>Récompense visuelle après la réponse (si les effets sont activés dans la Grille)</label>
+        <select id="mf-q-rewards">
+          <option value="correct" ${rw !== 'none' && rw !== 'answer' ? 'selected' : ''}>Seulement si la réponse est bonne</option>
+          <option value="answer" ${rw === 'answer' ? 'selected' : ''}>À chaque réponse envoyée</option>
+          <option value="none" ${rw === 'none' ? 'selected' : ''}>Aucune récompense</option>
+        </select>
+      </div>`;
+  }
+
+  /* Éditeur inline : une question = texte enrichi + type + barème. */
+  function questionsEditorHtml(qs) {
+    return `
+      <div id="mf-q-editor">${(qs || []).map((q, i) => qItemHtml(q, i)).join('')}</div>
+      <div class="form-actions" style="justify-content:flex-start">
+        <button type="button" class="btn" id="mf-q-add">＋ Ajouter une question</button>
+      </div>
+      <p class="hint">Réponse simple : comparaison souple (majuscules, accents et espaces ignorés) ;
+        réponse attendue vide = toute réponse compte. Choix multiple : c'est vous qui cochez
+        les bonnes propositions — l'élève ne voit pas la correction immédiatement, vous la verrez
+        dans son fichier de réponses.</p>`;
+  }
+
+  function qItemHtml(q, i) {
+    const isChoice = !!(q && q.type === 'choice');
+    const opts = (q && Array.isArray(q.options) && q.options.length)
+      ? q.options
+      : [{ text: '', correct: false }, { text: '', correct: false }];
+    return `
+      <fieldset class="module-fieldset mf-q-item" data-q-index="${i}">
+        <legend>Question ${i + 1}</legend>
+        <div class="inline mf-q-head" style="gap:1rem; align-items:center; flex-wrap:wrap">
+          <label class="inline" style="gap:.35rem">
+            <input type="checkbox" data-q-mc="${i}" ${isChoice ? 'checked' : ''}>
+            Choix multiple
+          </label>
+          <label class="inline" style="gap:.35rem">
+            Points
+            <input type="number" data-q-points="${i}" min="0" step="0.5"
+                   value="${esc(String((q && q.points != null) ? q.points : 1))}" style="width:4.5rem">
+          </label>
+          <button type="button" class="btn link danger" data-q-del="${i}" title="Supprimer cette question">🗑 Supprimer</button>
+        </div>
+        <div class="rte" data-rte-module="qedit" data-rte-field="qtext${i}">
+          ${rteToolbarHtml()}
+          <div class="rte-editor" contenteditable="true"
+               data-placeholder="Énoncé de la question (texte enrichi, images permises)…">${rteEditorHtml((q && q.html) || '')}</div>
+        </div>
+        <div class="mf-q-simple" ${isChoice ? 'hidden' : ''}>
+          <div class="field">
+            <label>Réponse attendue (facultative — vide = toute réponse compte)</label>
+            <input type="text" data-q-expected="${i}" value="${esc((q && q.expected) || '')}" placeholder="ex. 1789">
+          </div>
+        </div>
+        <div class="mf-q-choice" ${isChoice ? '' : 'hidden'}>
+          <div class="hint" style="margin:.3rem 0">Propositions — cochez la ou les bonnes réponses :</div>
+          ${opts.map((o, j) => `
+            <div class="inline" style="gap:.5rem; margin-bottom:.25rem">
+              <label class="inline" style="gap:.3rem" title="Bonne réponse">
+                <input type="checkbox" data-q-opt-ok="${i}:${j}" ${o && o.correct ? 'checked' : ''}>✔
+              </label>
+              <input type="text" data-q-opt="${i}:${j}" value="${esc((o && o.text) || '')}" placeholder="Proposition ${j + 1}" style="flex:1">
+            </div>`).join('')}
+          <button type="button" class="btn link" data-q-opt-add="${i}">＋ Ajouter une proposition</button>
+        </div>
+      </fieldset>`;
+  }
+
+  /* Lecture de l'éditeur → questions à enregistrer (HTML sanitisé ici). */
+  function collectQuestions() {
+    const wrap = document.getElementById('mf-q-editor');
+    if (!wrap) return [];
+    const out = [];
+    wrap.querySelectorAll('.mf-q-item').forEach((it) => {
+      const editor = it.querySelector('.rte-editor');
+      const raw = editor ? editor.innerHTML : '';
+      const withRefs = App.utils.htmlWithMediaRefs ? App.utils.htmlWithMediaRefs(raw) : raw;
+      const html = App.utils.sanitizeRich(withRefs);
+      if (!App.utils.stripHtml(html).trim()) return;      // question vide : ignorée
+      const mcEl = it.querySelector('[data-q-mc]');
+      const ptsEl = it.querySelector('[data-q-points]');
+      const q = {
+        html,
+        type: (mcEl && mcEl.checked) ? 'choice' : 'simple',
+        points: Math.max(0, Number(ptsEl && ptsEl.value) || 1),
+        options: [], expected: ''
+      };
+      if (q.type === 'choice') {
+        it.querySelectorAll('[data-q-opt]').forEach((inp) => {
+          const ok = it.querySelector('[data-q-opt-ok="' + inp.dataset.qOpt + '"]');
+          q.options.push({ text: inp.value, correct: !!(ok && ok.checked) });
+        });
+      } else {
+        const exp = it.querySelector('[data-q-expected]');
+        q.expected = exp ? exp.value.trim() : '';
+      }
+      out.push(q);
+    });
+    return out;
+  }
+
+  /* Modification structurelle (ajout/suppression) : on lit d'abord l'état
+     du DOM (sinon le texte saisi serait perdu), puis on reconstruit. */
+  function qStructural(fn) {
+    const cur = collectQuestions();
+    const next = (typeof fn === 'function') ? fn(cur) : cur;
+    const ed = document.getElementById('mf-q-editor');
+    if (ed) ed.innerHTML = (next || []).map((q, i) => qItemHtml(q, i)).join('');
+  }
+
+  /* Câblage de l'onglet Questions (délégué sur #mf-q-body). */
+  function bindQuestions() {
+    const body = document.getElementById('mf-q-body');
+    const qOn = document.getElementById('mf-questions-on');
+    if (qOn && body) qOn.addEventListener('change', () => { body.hidden = !qOn.checked; });
+    if (!body) return;
+    body.addEventListener('change', (e) => {
+      const mc = e.target.closest('[data-q-mc]');
+      if (!mc) return;
+      const it = mc.closest('.mf-q-item');
+      if (!it) return;
+      const simple = it.querySelector('.mf-q-simple');
+      const choice = it.querySelector('.mf-q-choice');
+      if (simple) simple.hidden = mc.checked;
+      if (choice) choice.hidden = !mc.checked;
+    });
+    body.addEventListener('click', (e) => {
+      const add = e.target.closest('#mf-q-add');
+      if (add) {
+        qStructural((cur) => {
+          cur.push({ html: '', type: 'simple', expected: '', options: [], points: 1 });
+          return cur;
+        });
+        return;
+      }
+      const del = e.target.closest('[data-q-del]');
+      if (del) {
+        qStructural((cur) => {
+          cur.splice(Number(del.dataset.qDel), 1);
+          return cur;
+        });
+        return;
+      }
+      const optAdd = e.target.closest('[data-q-opt-add]');
+      if (optAdd) {
+        qStructural((cur) => {
+          const q = cur[Number(optAdd.dataset.qOptAdd)];
+          if (q) { q.type = 'choice'; q.options.push({ text: '', correct: false }); }
+          return cur;
+        });
+      }
+    });
+  }
+
   function bindModuleForm() {
     document.getElementById('mf-save').addEventListener('click', saveModule);
     document.getElementById('mf-cancel').addEventListener('click', hideModuleForm);
@@ -591,7 +771,12 @@
       e.preventDefault();
       saveModule();
     });
-    /* Navigation entre onglets (Module / Présentation / Contenu du pool). */
+    /* Outils d'édition riche + questions : les éditeurs de l'onglet
+       « Questions » sont dans le formulaire, les gestionnaires communs
+       (barre d'outils, couleurs, images) s'y appliquent tels quels. */
+    bindFieldEvents(document.getElementById('module-form'));
+    bindQuestions();
+    /* Navigation entre onglets (Module / Présentation / Contenu du pool / Questions). */
     const tabs = document.getElementById('mf-tabs');
     if (tabs) tabs.addEventListener('click', (e) => {
       const b = e.target.closest('.modal-tab');
@@ -741,7 +926,13 @@
          vide = toujours visible. */
       revealRows: role === 'informative' ? revealChecked : [],
       infoMode: role === 'informative' && document.getElementById('mf-infomode') &&
-        document.getElementById('mf-infomode').value === 'title' ? 'title' : 'full' };
+        document.getElementById('mf-infomode').value === 'title' ? 'title' : 'full',
+      /* Questions de la fenêtre de visualisation : enregistrées telles quelles
+         (déjà sanitisées à la collecte). Pour un module neuf, l'onglet
+         demande d'abord d'enregistrer — questions éditables ensuite. */
+      questions: (!isNew && document.getElementById('mf-questions-on') &&
+        document.getElementById('mf-questions-on').checked) ? collectQuestions() : [],
+      qRewards: (document.getElementById('mf-q-rewards') || {}).value || 'correct' };
 
     if (editingModuleId == null) {
       const zoneEl = document.getElementById('mf-zone');
@@ -1863,7 +2054,23 @@ function applyRteLineHeight(editor, lineHeightVal) {
         '</div>' +
       '</div>';
 
+    /* Bouton « Question(s) » : présent quand le module en porte — état pulsant
+       tant qu'aucune réponse n'a été donnée (chez l'élève, l'état est mémorisé). */
     const closeLayer = () => { if (layer) layer.innerHTML = ''; };
+    if (App.utils.qNormalize(m).length) {
+      const qHead = layer.querySelector('.modal-head');
+      const qBtn = document.createElement('button');
+      qBtn.type = 'button';
+      qBtn.className = 'q-badge is-pending';
+      qBtn.setAttribute('data-questions-badge', m.id);
+      qBtn.textContent = '❓ Question(s)';
+      qBtn.title = 'Voir les questions (aperçu prof — rien n\'est enregistré)';
+      if (qHead) qHead.appendChild(qBtn);
+      qBtn.addEventListener('click', () => {
+        layer.innerHTML = questionsPreviewShell(m);
+        bindQuestionsPreview(m);
+      });
+    }
     layer.querySelector('.reading-preview-backdrop').addEventListener('click', (e) => {
       if (e.target.classList.contains('reading-preview-backdrop') || e.target.hasAttribute('data-preview-close')) {
         e.stopPropagation();
@@ -1876,6 +2083,74 @@ function applyRteLineHeight(editor, lineHeightVal) {
       if (e.key === 'Escape') { e.stopPropagation(); closeLayer(); document.removeEventListener('keydown', onKey, true); }
     };
     document.addEventListener('keydown', onKey, true);
+  }
+
+  /* Aperçu prof de la fenêtre Questions (aucune réponse enregistrée) : mêmes
+     écrans que l'élève — énoncés mis en forme, propositions cochables, champs
+     libres, barème affiché, correction instantanée sur demande. */
+  function questionsPreviewShell(m) {
+    const qs = App.utils.qNormalize(m);
+    return '<div class="modal-backdrop reading-preview-backdrop">' +
+      '<div class="modal" role="dialog" aria-modal="true">' +
+        '<div class="modal-head"><h3>Questions — ' + esc(m.label || m.id) + '</h3>' +
+          '<button type="button" class="modal-close" data-preview-close aria-label="Fermer l\'aperçu">✕</button></div>' +
+        '<div class="modal-body"><form id="q-preview-form" novalidate>' +
+          qs.map((q, i) => `
+            <fieldset class="module-fieldset">
+              <legend>Question ${i + 1} — ${esc(String(q.points))} point${q.points > 1 ? 's' : ''}${q.type === 'choice' ? ' (choix multiple)' : ''}</legend>
+              <div class="modal-rich">${App.utils.resolveMediaInHtml(q.html)}</div>
+              ${q.type === 'choice'
+                ? q.options.map((o, j) =>
+                    '<label class="inline" style="gap:.4rem; margin:.15rem 0"><input type="checkbox" data-q-pick="' + i + ':' + j + '"> ' +
+                    esc(o.text) + '</label>').join('')
+                : '<input type="text" data-q-free="' + i + '" placeholder="Ta réponse…" style="width:100%">'}
+            </fieldset>`).join('') +
+          '<div class="form-actions"><button type="button" class="btn primary" id="q-preview-check">✓ Corriger (aperçu)</button>' +
+          '<button type="button" class="btn" data-preview-close>Fermer</button></div>' +
+          '<div id="q-preview-result" class="hint" style="margin-top:.5rem"></div>' +
+        '</form></div>' +
+      '</div>' +
+    '</div>';
+  }
+
+  function bindQuestionsPreview(m) {
+    const layer = document.getElementById('reading-preview-root');
+    if (!layer) return;
+    const close = () => { if (layer) layer.innerHTML = ''; };
+    layer.querySelector('.reading-preview-backdrop').addEventListener('click', (e) => {
+      if (e.target.classList.contains('reading-preview-backdrop') || e.target.hasAttribute('data-preview-close')) {
+        e.stopPropagation();
+        close();
+      }
+    });
+    const onKey = (e) => {
+      if (e.key === 'Escape') { e.stopPropagation(); close(); document.removeEventListener('keydown', onKey, true); }
+    };
+    document.addEventListener('keydown', onKey, true);
+    const checkBtn = document.getElementById('q-preview-check');
+    if (!checkBtn) return;
+    checkBtn.addEventListener('click', () => {
+      const qs = App.utils.qNormalize(m);
+      let total = 0, max = 0;
+      const lines = qs.map((q, i) => {
+        let resp = '';
+        if (q.type === 'choice') {
+          resp = [...layer.querySelectorAll('[data-q-pick="' + i + ':"]')]
+            .filter((cb) => cb.checked)
+            .map((cb) => q.options[Number(cb.dataset.qPick.split(':')[1])].text);
+        } else {
+          const inp = layer.querySelector('[data-q-free="' + i + '"]');
+          resp = inp ? inp.value : '';
+        }
+        const chk = App.utils.qCheck(q, resp);
+        total += chk.points;
+        max += App.utils.qMaxPoints(q);
+        return 'Question ' + (i + 1) + ' : ' +
+          (chk.correct ? '✓ juste — ' + chk.points + ' pt(s)' : '✗ pas encore') ;
+      });
+      const res = document.getElementById('q-preview-result');
+      if (res) res.textContent = lines.join(' · ') + (max ? ' — total : ' + total + ' / ' + max + ' points' : '');
+    });
   }
 
   function onFileField(input, baseId) {

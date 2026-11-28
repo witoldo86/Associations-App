@@ -1713,3 +1713,39 @@ body.student-mode #s-pools-zone .pool-col.is-expanded .item-image img{
 .fx-end-stars .dim{ color:#d1d5db; }
 .fx-end-score{ font-size:1.15rem; font-weight:600; margin:.4rem 0 .2rem; }
 .fx-end-msg{ color:#374151; margin:.2rem 0 .9rem; }
+
+/* =========================================================
+   QUESTIONS DANS LES FENÊTRES DE VISUALISATION
+   Bouton « Question(s) » de l'en-tête : il pulse doucement tant que
+   l'élève n'a pas répondu, puis passe à l'état « Répondu ».
+   ========================================================= */
+.q-badge{
+  display:inline-flex; align-items:center; gap:.3rem;
+  margin-right:.75rem; padding:.2rem .7rem;
+  border-radius:999px; border:2px solid #2563eb;
+  background:#eff6ff; color:#1e40af;
+  font-size:.85rem; font-weight:600; cursor:pointer;
+  white-space:nowrap;
+}
+.q-badge:hover{ background:#dbeafe; }
+.q-badge.is-pending{ animation:q-pulse 1.8s ease-in-out infinite; }
+.q-badge.is-answered{
+  border-color:#16a34a; background:#f0fdf4; color:#166534;
+  animation:none;
+}
+@keyframes q-pulse{
+  0%, 100%{ transform:scale(1);    box-shadow:0 0 0 0 rgba(37,99,235,.45); }
+  50%     { transform:scale(1.06); box-shadow:0 0 0 7px rgba(37,99,235,0); }
+}
+@media (prefers-reduced-motion: reduce){
+  .q-badge.is-pending{ animation:none; }
+}
+/* Modale des questions : propositions lisibles et cliquables. */
+#q-form .mf-q-item, #q-preview-form .mf-q-item{ margin-bottom:.9rem; }
+#q-form .q-opt, #q-preview-form label.q-opt{
+  display:flex; align-items:center; gap:.45rem;
+  padding:.3rem .5rem; border-radius:8px; cursor:pointer;
+}
+#q-form .q-opt:hover{ background:#f1f5f9; }
+/* Point d'interrogation sur les blocs de la maquette (côté prof). */
+.mq-chip .badge[title*="questions"]{ cursor:help; }

@@ -88,6 +88,24 @@
         cfg.subtitle = App.utils.sanitizeRich(cfg.subtitle);
       }
 
+      // Questions des fenêtres de visualisation : HTML importé jamais cru sur parole.
+      cfg.modules.forEach((m) => {
+        if (!Array.isArray(m.questions)) return;
+        m.questions = m.questions.filter((q) => q && typeof q === 'object');
+        m.questions.forEach((q) => {
+          q.html = App.utils.sanitizeRich(String(q.html || ''));
+          q.type = q.type === 'choice' ? 'choice' : 'simple';
+          q.expected = q.expected != null ? String(q.expected) : '';
+          q.points = Math.max(0, Number(q.points) || 1);
+          if (Array.isArray(q.options)) {
+            q.options = q.options.map((o) => ({
+              text: (o && o.text != null) ? String(o.text) : '',
+              correct: !!(o && o.correct)
+            }));
+          } else q.options = [];
+        });
+      });
+
       // Textes enrichis : cartels, plus les présentations des son/vidéo/page web
       const rich = cfg.modules.filter((m) =>
         m.kind === 'richtext' || m.kind === 'audio' || m.kind === 'video' || m.kind === 'url');

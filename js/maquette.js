@@ -376,12 +376,16 @@
     const badge = showWidth ? '' : '<span class="badge">' + esc(kindLabel(m)) + '</span>';
     const lock = (m.unlockAfter && m.unlockAfter.length)
       ? ' <span class="badge" title="Verrou pédagogique actif">🔒</span>' : '';
+    /* Questions posées dans la fenêtre de visualisation : le prof voit d'un
+       coup d'œil où il a placé des questions (❓). */
+    const qmark = (App.utils.qNormalize(m).length)
+      ? ' <span class="badge" title="Contient des questions">❓</span>' : '';
     const actions = showWidth ? '' : chipActions(m.id, false, m.role !== 'associate');
     return '<div class="mq-chip mq-chip-module' + (m.role === 'associate' ? ' is-assoc' : '') +
       '" data-drag-kind="module" data-drag-id="' + esc(m.id) + '" title="' + esc(m.id) + '"' + style + '>' +
       '<span class="mq-grip" aria-hidden="true">⣿</span>' +
       '<span class="mq-name">' + esc(modLabel(m)) + '</span>' +
-      badge + lock +
+      badge + lock + qmark +
       actions + '</div>';
   }
 
