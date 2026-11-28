@@ -751,8 +751,11 @@
       }
       if (m.kind === 'richtext' && v) {
         const txt = App.utils.stripHtml(v.html);
+        /* Le titre est un texte enrichi (avec mise en forme) : on affiche
+           son texte, jamais les balises (span style…). */
+        const plainTitle = v.title ? App.utils.stripHtml(String(v.title)) : '';
         return num + '<div class="mini-info">' +
-          (v.title ? '<strong>' + esc(v.title) + '</strong> ' : '') +
+          (plainTitle ? '<strong>' + esc(plainTitle) + '</strong> ' : '') +
           esc(txt.slice(0, 160) || '(vide)') + '</div>';
       }
       if ((m.kind === 'audio' || m.kind === 'video') && v) {
