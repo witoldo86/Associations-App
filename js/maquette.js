@@ -89,10 +89,38 @@
   /* Les polices ne se choisissent plus ici : le titre et la consigne dans
      leurs fenêtres d'édition (bouton ✎ de l'aperçu), les contenus dans chaque
      éditeur de texte enrichi. Le texte simple utilise la police système. */
+  /* Styles de layout prêts à l'emploi (palettes) : le menu reflète les
+     couleurs courantes — si elles correspondent à une palette, celle-ci est
+     présélectionnée ; sinon « Personnalisé ». */
+  function paletteKeyOf() {
+    const t = (draft && draft.theme) || {};
+    return Object.keys(T.PALETTES).find((k) => {
+      const p = T.PALETTES[k];
+      return String(t.primary || '').toLowerCase() === p.primary &&
+             String(t.bg || '').toLowerCase() === p.bg &&
+             String(t.ink || '').toLowerCase() === p.ink;
+    }) || '';
+  }
+  function paletteOptions() {
+    const cur = paletteKeyOf();
+    let html = '<option value=""' + (cur ? '' : ' selected') + '>Personnalisé (réglage libre)</option>';
+    Object.keys(T.PALETTES).forEach((k) => {
+      html += '<option value="' + k + '"' + (cur === k ? ' selected' : '') + '>' +
+        esc(T.PALETTES[k].label) + '</option>';
+    });
+    return html;
+  }
+  function syncPalette() {
+    const sel = root.querySelector('#mq-palette');
+    if (sel) { const k = paletteKeyOf(); if (sel.value !== k) sel.value = k; }
+  }
+
   function styleBarHtml() {
     return `
       <div class="mq-stylebar">
         <span class="mq-stylebar-title">Style général</span>
+        <div class="field"><label for="mq-palette">Style de layout</label>
+          <select id="mq-palette">${paletteOptions()}</select></div>
         <div class="inline inline-colors">
           <div class="field field-auto"><label for="mq-primary">Principale</label>
             <input id="mq-primary" type="color" data-mq="theme.primary"></div>
@@ -144,10 +172,23 @@
     root.addEventListener('click', onClick);
     root.addEventListener('dblclick', onDblClick);
 
+    /* Style de layout : choisir une palette règle d'un coup principale,
+       fond et texte (réglables ensuite à la main). */
+    const pal = root.querySelector('#mq-palette');
+    if (pal) pal.addEventListener('change', () => {
+      const p = T.PALETTES[pal.value];
+      if (!p) return;
+      draft.theme = Object.assign({}, draft.theme, { primary: p.primary, bg: p.bg, ink: p.ink });
+      syncControls();
+      renderPreview();
+      scheduleApply();
+    });
+
     App.state.onChange(() => {
       if (applyTimer) { clearTimeout(applyTimer); applyTimer = null; }
       draft = fromState();
       syncControls();
+      syncPalette();
       renderPreview();
       setStatus('', false);
     });
@@ -196,6 +237,7 @@
     if (!el) return;
     const key = el.dataset.mq;
     setVal(key, (key === 'boardCols' || key === 'poolsCols') ? gridN(el.value) : el.value);
+    if (String(key).indexOf('theme.') === 0) syncPalette();
     renderPreview();
     scheduleApply();
   }
@@ -273,7 +315,7 @@
     if (!btn) return;
     if (btn.id === 'mq-reset-style') {
       draft.theme = T.resolve({});
-      syncControls(); renderPreview(); scheduleApply();
+      syncControls(); syncPalette(); renderPreview(); scheduleApply();
     }
   }
 

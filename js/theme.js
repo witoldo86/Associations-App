@@ -39,11 +39,24 @@
     titleFont: '', subtitleFont: ''
   };
 
+  /* Styles de layout prêts à l'emploi : palettes extraites de thèmes fournis
+     par le prof (schémas de couleurs KDE convertis en couleurs web). Chaque
+     palette règle la couleur principale, le fond et la couleur du texte —
+     réglables ensuite à la main dans le cadre « Style général ». */
+  const PALETTES = {
+    optimal:     { label: 'Optimal — gris anthracite',          primary: '#898989', bg: '#545454', ink: '#efefef' },
+    elegantdark: { label: 'Elegant Dark — sombre et bleu doux', primary: '#96bff0', bg: '#242323', ink: '#cacaca' },
+    zvonblack:   { label: 'Zvon Black — néon sur noir',         primary: '#00ff00', bg: '#000000', ink: '#c0ffff' },
+    purogrey:    { label: 'Puro Grey — gris clair et prune',    primary: '#890067', bg: '#c6c6c6', ink: '#1e1e1e' },
+    luckyeyes:   { label: 'Lucky Eyes — bleu profond sur clair', primary: '#00518c', bg: '#f0f0f0', ink: '#1e1e28' },
+    wontonsoup:  { label: 'Wonton Soup — bleu ardoise',         primary: '#7795b3', bg: '#494e58', ink: '#b6c1d0' }
+  };
+
   const HEX = /^#[0-9a-f]{6}$/i;
   const has = (table, key) => Object.prototype.hasOwnProperty.call(table, key);
   const pick = (table, key, def) => (has(table, key) ? key : def);
 
-  const T = (App.theme = { FONTS, SCALES, RADII, TITLE_SIZES, SUBTITLE_SIZES, DEFAULTS });
+  const T = (App.theme = { FONTS, SCALES, RADII, TITLE_SIZES, SUBTITLE_SIZES, DEFAULTS, PALETTES });
 
   /** Complète et valide un thème (clés manquantes ou invalides → valeurs par défaut). */
   T.resolve = function (t) {
